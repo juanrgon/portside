@@ -19,7 +19,7 @@ body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 54px;
+  height: 4.154rem;
   padding: 0 14px;
 }
 .lead { display: grid; place-items: center; width: 20px; height: 20px; color: var(--ink-soft); }
@@ -31,7 +31,7 @@ body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 
   border: 0;
   outline: none;
   background: none;
-  font-size: 19px;
+  font-size: 1.462rem;
   font-weight: 500;
   letter-spacing: -0.01em;
   user-select: text;
@@ -45,23 +45,23 @@ body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 44px;
+  height: 3.385rem;
   padding: 0 12px 0 14px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 1.077rem;
 }
 .hit .glyph { display: grid; place-items: center; width: 20px; height: 20px; flex: none; color: var(--ink-soft); }
 .hit .glyph img { width: 16px; height: 16px; border-radius: 3px; }
 .hit .text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .hit .title { font-weight: 500; }
 .hit .sub { margin-left: 10px; color: var(--ink-soft); }
-.hit .side { display: flex; align-items: center; gap: 8px; flex: none; color: var(--ink-faint); font-size: 12px; }
+.hit .side { display: flex; align-items: center; gap: 8px; flex: none; color: var(--ink-faint); font-size: 0.923rem; }
 .hit kbd {
   padding: 2px 6px;
   border-radius: 5px;
   background: var(--line);
   font: inherit;
-  font-size: 11px;
+  font-size: 0.846rem;
 }
 .hit .go {
   display: grid;
@@ -76,4 +76,4 @@ body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 
 .hit.on .glyph, .hit.on .sub, .hit.on .side { color: inherit; }
 .hit.on .sub, .hit.on .side { opacity: 0.8; }
 .hit.on kbd, .hit.on .go { background: oklch(1 0 0 / 0.22); }
-.group { padding: 8px 14px 4px; color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.group { padding: 8px 14px 4px; color: var(--ink-soft); font-size: 0.846rem; font-weight: 600; }

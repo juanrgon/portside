@@ -28,7 +28,7 @@ From top to bottom:
 
 - **Link pill.** Shows the site you are on. Click it to edit the link in the command bar. The chain icon copies the link.
 - **Favorites.** A grid of icons that shows in every space. A favorite is a pinned tab in Chrome's tab strip.
-- **Space name.** Double-click to rename. The `...` button changes its color and icon, adds folders, and deletes the space.
+- **Space name.** Double-click to rename. The `...` button changes its color and icon, adds folders, sets the text size, and deletes the space.
 - **Pinned tabs.** They belong to one space and never get archived. A dimmed pin has no tab open. Click it and it opens on its saved page.
 - **The line.** Above it is pinned. Below it is today. **Clear** archives everything below the line.
 - **Today.** Normal tabs, newest on top. They move to the archive after 12 hours of no use.

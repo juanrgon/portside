@@ -303,6 +303,7 @@ if (mode === "window") {
   data = await send("barData");
   const space = data.spaces.find((s) => s.id === data.activeSpaceId);
   document.body.dataset.color = space?.color || "purple";
+  document.documentElement.style.fontSize = `${data.settings.textSize}px`;
   if (prefill) {
     input.value = prefill;
     input.select();

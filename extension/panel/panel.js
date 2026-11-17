@@ -458,6 +458,16 @@ function spaceMenu(space) {
   const emojis = h("div", { class: "emojis" },
     EMOJI.map((emoji) => h("button", { "aria-label": emoji, onclick: () => { closeMenu(); act("updateSpace", { id: space.id, patch: { icon: emoji } }); } }, emoji)),
   );
+  const sizes = h("div", { class: "sizes" }, model.textSizes.map((size, index) =>
+    h("button", {
+      class: size === model.settings.textSize ? "on" : "",
+      style: `font-size:${11 + index * 1.5}px`,
+      title: `${size} px`,
+      "aria-label": `Text size ${size}`,
+      "aria-pressed": String(size === model.settings.textSize),
+      onclick: () => { closeMenu(); act("setSetting", { key: "textSize", value: size }); },
+    }, "Aa"),
+  ));
   return [
     { label: "Rename space", run: () => renameSpace(space) },
     { label: "New folder", run: async () => { const id = await act("addFolder", {}); const row = app.querySelector(`.folder[data-id="${id}"] > .row`); if (row) renameIn(row, "New Folder", (name) => send("renameFolder", { id, name })); } },
@@ -467,6 +477,9 @@ function spaceMenu(space) {
     { label: "Icon" },
     { node: emojis },
     space.icon && { label: "No icon", run: () => act("updateSpace", { id: space.id, patch: { icon: "" } }) },
+    "-",
+    { label: "Text size" },
+    { node: sizes },
     "-",
     { label: model.settings.barOnNewTab ? "Use Chrome's own new tab page" : "Use the command bar for new tabs", run: () => act("setSetting", { key: "barOnNewTab", value: !model.settings.barOnNewTab }) },
     { label: "Set up keyboard shortcuts", run: () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }) },
@@ -612,6 +625,7 @@ async function refresh() {
     const keepScroll = app.querySelector(".scroll")?.scrollTop || 0;
     const hadSearchFocus = document.activeElement?.matches?.(".search input");
     app.dataset.color = model.space.color;
+    document.documentElement.style.fontSize = `${model.settings.textSize}px`;
 
     const scroll = h("div", { class: "scroll" });
     if (mode === "archive") {

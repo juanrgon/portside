@@ -2,7 +2,7 @@
 // happens here, one at a time, so the sidebar and the command bar only have
 // to ask for things and draw the result.
 
-import { ARCHIVE_HOURS, ARCHIVE_LIMIT, COLORS, getSess, getState, mutate, settled, uid } from "./lib/store.js";
+import { ARCHIVE_HOURS, ARCHIVE_LIMIT, COLORS, TEXT_SIZES, getSess, getState, mutate, settled, uid } from "./lib/store.js";
 import { cleanUrl, hostOf, isWeb, staleTabs } from "./lib/url.js";
 
 const ORIGIN = chrome.runtime.getURL("");
@@ -398,6 +398,7 @@ async function view({ windowId }) {
     archiveCount: state.archive.length,
     settings: state.settings,
     archiveHours: ARCHIVE_HOURS,
+    textSizes: TEXT_SIZES,
   };
 }
 
@@ -709,6 +710,7 @@ const handlers = {
   setSetting: change((state, sess, { key, value }) => {
     if (key === "archiveAfterHours" && ARCHIVE_HOURS.includes(value)) state.settings.archiveAfterHours = value;
     if (key === "barOnNewTab") state.settings.barOnNewTab = !!value;
+    if (key === "textSize" && TEXT_SIZES.includes(value)) state.settings.textSize = value;
   }),
 
   lastTab: async ({ windowId }) => {

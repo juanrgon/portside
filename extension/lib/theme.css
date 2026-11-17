@@ -5,7 +5,9 @@
   --hue: 300;
   --chroma: 1;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  font-size: 13px;
+  /* Every text size and row height is in rem, so this one number scales the whole thing.
+     The pages set it from the "Text size" setting. */
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 

@@ -6,6 +6,7 @@
 
 export const COLORS = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
 export const ARCHIVE_HOURS = [12, 24, 168, 720];
+export const TEXT_SIZES = [13, 14, 15, 16, 18];
 export const ARCHIVE_LIMIT = 1000;
 
 export function uid() {
@@ -22,7 +23,7 @@ function defaults() {
     pinned: [],
     folders: [],
     archive: [],
-    settings: { archiveAfterHours: 12, barOnNewTab: true },
+    settings: { archiveAfterHours: 12, barOnNewTab: true, textSize: 15 },
   };
 }
 
