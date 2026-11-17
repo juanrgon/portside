@@ -39,7 +39,7 @@ async function until(t, test, message) {
 const titles = (rows) => rows.map((row) => row.title);
 const row = (t, text) => t.panel.locator(".row", { hasText: text }).first();
 
-await check("new tabs land in the current space, newest on top", async (t) => {
+await check("new tabs land in the current tab group, newest on top", async (t) => {
   await t.open("docs", "Plan");
   await t.open("news", "Fees");
   const view = await until(t, (v) => v.today.length === 3, "three tabs should be listed");
@@ -61,7 +61,7 @@ await check("a pinned tab outlives its tab and reopens on its saved page", async
   const tabId = await t.open("github", "Pull requests");
   await until(t, (v) => v.today.length === 2, "the new tab should be listed");
   await row(t, "Pull requests").click({ button: "right" });
-  await t.panel.locator(".menu .item", { hasText: "Pin to this space" }).click();
+  await t.panel.locator(".menu .item", { hasText: "Pin to this tab group" }).click();
   let view = await until(t, (v) => v.pinned.length === 1 && v.today.length === 1, "the tab should move above the line");
   assert.equal(view.pinned[0].loaded, true);
 
@@ -82,7 +82,7 @@ await check("a pinned tab outlives its tab and reopens on its saved page", async
   assert.equal(view.today.length, 1, "a pinned tab is not listed twice");
 });
 
-await check("a favorite is pinned in Chrome and shows in every space", async (t) => {
+await check("a favorite is pinned in Chrome and shows in every tab group", async (t) => {
   const tabId = await t.open("mail", "Inbox");
   await until(t, (v) => v.today.length === 2, "the new tab should be listed");
   await row(t, "Inbox").click({ button: "right" });
@@ -90,7 +90,7 @@ await check("a favorite is pinned in Chrome and shows in every space", async (t)
   await until(t, (v) => v.favorites.length === 1 && v.today.length === 1, "the tab should become a favorite");
   assert.equal((await t.tabs()).find((tab) => tab.id === tabId).pinned, true);
 
-  await t.panel.locator(".foot .chip[title='New space']").click();
+  await t.panel.locator(".foot .chip[title='New tab group']").click();
   await t.panel.locator(".space-head input.rename").waitFor();
   await t.panel.keyboard.type("Work");
   await t.panel.keyboard.press("Enter");
@@ -99,7 +99,7 @@ await check("a favorite is pinned in Chrome and shows in every space", async (t)
   assert.equal(view.spaces.length, 2);
 });
 
-await check("switching spaces swaps the tab list and folds the other space away", async (t) => {
+await check("switching tab groups swaps the tab list and folds the other group away", async (t) => {
   await t.open("docs", "Home doc");
   await until(t, (v) => v.today.length === 2, "home should have two tabs");
   const work = await t.ask("addSpace", { name: "Work" });
@@ -215,7 +215,7 @@ await check("escape on a new tab goes back to the tab you came from", async (t) 
   await until(t, (v) => v.today.find((x) => x.tabId === from)?.active, "escape should return to the earlier tab");
 });
 
-await check("a tab group made in Chrome's tab strip becomes a space", async (t) => {
+await check("a tab group made in Chrome's tab strip shows up in the sidebar", async (t) => {
   const tabId = await t.open("shop", "Cart");
   await until(t, (v) => v.today.length === 2, "setup");
   await t.worker.evaluate(async (id) => {
@@ -228,7 +228,7 @@ await check("a tab group made in Chrome's tab strip becomes a space", async (t) 
   assert.deepEqual(titles(view.today), ["Start"], "its tab leaves the current space's list");
 });
 
-await check("after a restart, pins, favorites, and spaces find their tabs again", async (t) => {
+await check("after a restart, pins, favorites, and tab groups find their tabs again", async (t) => {
   // A restart hands out new tab and group ids. Wiping what the extension
   // remembers for this session is the same thing from its point of view.
   const inbox = await t.open("mail", "Inbox", "inbox");

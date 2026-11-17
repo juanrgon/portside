@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const extension = fileURLToPath(new URL("../../extension", import.meta.url));
 
-export async function start({ colorScheme = "light" } = {}) {
+export async function start({ colorScheme = "light", domain = "localhost" } = {}) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const title = url.searchParams.get("t") || url.pathname.slice(1) || "Page";
@@ -21,14 +21,15 @@ export async function start({ colorScheme = "light" } = {}) {
   });
   await new Promise((done) => server.listen(0, "127.0.0.1", done));
   const port = server.address().port;
-  const site = (host, title, path = "") => `http://${host}.localhost:${port}/${path}?t=${encodeURIComponent(title)}`;
+  // Any `domain` works: Chromium is told to send every name ending in .test to this machine.
+  const site = (host, title, path = "") => `http://${host}.${domain}:${port}/${path}?t=${encodeURIComponent(title)}`;
 
   const profile = mkdtempSync(join(tmpdir(), "portside-"));
   const context = await chromium.launchPersistentContext(profile, {
     headless: false,
     colorScheme,
     viewport: { width: 380, height: 760 },
-    args: ["--headless=new", `--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--no-first-run"],
+    args: ["--headless=new", `--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--no-first-run", "--host-resolver-rules=MAP *.test 127.0.0.1"],
   });
   const worker = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
   const id = new URL(worker.url()).host;

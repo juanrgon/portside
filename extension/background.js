@@ -13,7 +13,7 @@ const isOurs = (url) => (url || "").startsWith(ORIGIN) || url === "chrome://newt
 // ---------------------------------------------------------------- spaces ↔ tab groups
 
 function uniqueName(state, wanted, exceptId) {
-  const base = (wanted || "").trim() || "Space";
+  const base = (wanted || "").trim() || "Group";
   const taken = new Set(state.spaces.filter((s) => s.id !== exceptId).map((s) => s.name));
   if (!taken.has(base)) return base;
   let n = 2;
@@ -637,7 +637,7 @@ const handlers = {
 
   addSpace: change(async (state, sess, { windowId, name, naming }) => {
     const color = COLORS.find((c) => c !== "grey" && !state.spaces.some((s) => s.color === c)) || "blue";
-    const space = { id: uid(), name: uniqueName(state, name || "New Space"), icon: "", color };
+    const space = { id: uid(), name: uniqueName(state, name || "New Group"), icon: "", color };
     state.spaces.push(space);
     if (naming) {
       // The sidebar is about to ask for a name. Opening the space's first tab now

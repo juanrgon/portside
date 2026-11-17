@@ -340,7 +340,7 @@ const favDrop = {
 function linkPill() {
   const host = hostOf(model.activeUrl);
   const takesFavs = model.favorites.length ? {} : dropInto((item) => act("move", { item, to: { zone: "favs" } }));
-  return h("div", { class: `link${model.favorites.length ? "" : " takes-drop"}`, data: { drop: "Drop here to keep it in every space" }, ...takesFavs, role: "button", tabIndex: 0, title: "Search or go to a link", onclick: () => send("openBar", { prefill: model.activeUrl }), onkeydown: (e) => e.key === "Enter" && send("openBar", { prefill: model.activeUrl }) },
+  return h("div", { class: `link${model.favorites.length ? "" : " takes-drop"}`, data: { drop: "Drop here to keep it in every tab group" }, ...takesFavs, role: "button", tabIndex: 0, title: "Search or go to a link", onclick: () => send("openBar", { prefill: model.activeUrl }), onkeydown: (e) => e.key === "Enter" && send("openBar", { prefill: model.activeUrl }) },
     icon(host ? "lock" : "search"),
     h("span", { class: "host" }, host || "Search or enter a link"),
     model.activeUrl && h("button", { class: "chip", title: "Copy link", "aria-label": "Copy link", onclick: (e) => { e.stopPropagation(); act("copyUrl", {}); } }, icon("link")),
@@ -435,7 +435,7 @@ function todayRow(tab) {
     onkeydown: (e) => e.key === "Enter" && act("activateTab", { tabId: tab.tabId }),
     onauxclick: (e) => e.button === 1 && act("closeTab", { tabId: tab.tabId }),
     oncontextmenu: (event) => menuAt(event, [
-      { label: "Pin to this space", run: () => act("move", { item, to: { zone: "pinned" } }) },
+      { label: "Pin to this tab group", run: () => act("move", { item, to: { zone: "pinned" } }) },
       { label: "Add to favorites", run: () => act("move", { item, to: { zone: "favs" } }) },
       copyLink(tab.url),
       ...moveToSpaceItems((spaceId) => act("moveTabToSpace", { tabId: tab.tabId, spaceId })),
@@ -469,7 +469,7 @@ function spaceMenu(space) {
     }, "Aa"),
   ));
   return [
-    { label: "Rename space", run: () => renameSpace(space) },
+    { label: "Rename tab group", run: () => renameSpace(space) },
     { label: "New folder", run: async () => { const id = await act("addFolder", {}); const row = app.querySelector(`.folder[data-id="${id}"] > .row`); if (row) renameIn(row, "New Folder", (name) => send("renameFolder", { id, name })); } },
     "-",
     { label: "Color" },
@@ -485,14 +485,14 @@ function spaceMenu(space) {
     { label: "Set up keyboard shortcuts", run: () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }) },
     model.spaces.length > 1 && "-",
     model.spaces.length > 1 && {
-      label: "Delete space…",
+      label: "Delete tab group…",
       danger: true,
       keepOpen: true,
       run: () => {
         const box = menuEl.getBoundingClientRect();
         openMenu(box.left, box.top, [
           { label: `Delete “${space.name}” and its pinned tabs?` },
-          { label: "Delete space", danger: true, run: () => act("deleteSpace", { id: space.id }) },
+          { label: "Delete tab group", danger: true, run: () => act("deleteSpace", { id: space.id }) },
           { label: "Keep it", run: () => {} },
         ]);
       },
@@ -511,14 +511,14 @@ function spaceHead() {
   const empty = !model.pinned.length && !model.folders.length;
   return h("div", {
     class: `space-head${empty ? " takes-drop" : ""}`,
-    data: { drop: "Drop here to pin it to this space" },
+    data: { drop: "Drop here to pin it to this tab group" },
     ...dropInto((item) => act("move", { item, to: { zone: "pinned", index: 0 } })),
     ondblclick: () => renameSpace(space),
     oncontextmenu: (event) => menuAt(event, spaceMenu(space)),
   },
     space.icon && h("span", { class: "emoji" }, space.icon),
     h("span", { class: "name" }, space.name),
-    h("button", { class: "chip", title: "Space options", "aria-label": "Space options", onclick: (event) => { const box = event.currentTarget.getBoundingClientRect(); event.stopPropagation(); openMenu(box.left, box.bottom + 4, spaceMenu(space)); } }, icon("dots")),
+    h("button", { class: "chip", title: "Tab group options", "aria-label": "Tab group options", onclick: (event) => { const box = event.currentTarget.getBoundingClientRect(); event.stopPropagation(); openMenu(box.left, box.bottom + 4, spaceMenu(space)); } }, icon("dots")),
   );
 }
 
@@ -539,7 +539,7 @@ function foot() {
         }, (item) => item.kind !== "fav" && space.id !== model.space.id),
       }, space.icon || h("i")),
     )),
-    h("button", { class: "chip", title: "New space", "aria-label": "New space", onclick: async () => {
+    h("button", { class: "chip", title: "New tab group", "aria-label": "New tab group", onclick: async () => {
       mode = "tabs";
       const id = await act("addSpace", { naming: true });
       if (id) renameSpace(model.space, () => send("switchSpace", { id }));
@@ -557,12 +557,12 @@ function tabsBody() {
   const empty = !loose.length && !folders.length && !model.today.length;
   return [
     h("div", { class: "list pins", ...dropList({ zone: "pinned" }) }, loose.map(pinRow), folders),
-    h("div", { class: "divider" }, model.today.length > 0 && h("button", { title: "Archive every unpinned tab in this space", onclick: () => act("clearToday", {}) }, icon("down"), "Clear")),
+    h("div", { class: "divider" }, model.today.length > 0 && h("button", { title: "Archive every unpinned tab in this tab group", onclick: () => act("clearToday", {}) }, icon("down"), "Clear")),
     h("div", { class: "list today", ...dropList({ zone: "today" }) },
       h("div", { class: "row new", role: "button", tabIndex: 0, onclick: () => act("newTab", {}), onkeydown: (e) => e.key === "Enter" && act("newTab", {}) }, icon("plus"), h("span", { class: "title" }, "New Tab")),
       model.today.map(todayRow),
     ),
-    empty && h("div", { class: "hint" }, "Drag a tab above the line to pin it to this space. Unpinned tabs move to the archive after a while."),
+    empty && h("div", { class: "hint" }, "Drag a tab above the line to pin it to this tab group. Unpinned tabs move to the archive after a while."),
   ];
 }
 

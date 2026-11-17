@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Portside",
   "version": "0.1.0",
-  "description": "A sidebar with spaces, pinned tabs, a command bar, and tabs that tidy themselves up. Everything stays on this computer.",
+  "description": "A sidebar for your tab groups, with pinned tabs, a command bar, and tabs that tidy themselves up. Everything stays on this computer.",
   "minimum_chrome_version": "121",
   "permissions": [
     "tabs",
@@ -46,9 +46,9 @@
       "suggested_key": { "default": "Alt+Q", "mac": "Alt+Q" },
       "description": "Jump back to the tab you were on before"
     },
-    "next-space": { "description": "Go to the next space" },
-    "previous-space": { "description": "Go to the previous space" },
+    "next-space": { "description": "Go to the next tab group" },
+    "previous-space": { "description": "Go to the previous tab group" },
     "pin-tab": { "description": "Pin or unpin the current tab" },
-    "clear-today": { "description": "Archive every unpinned tab in this space" }
+    "clear-today": { "description": "Archive every unpinned tab in this tab group" }
   }
 }

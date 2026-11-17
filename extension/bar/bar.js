@@ -123,7 +123,7 @@ function actions() {
     { label: "View archive…", run: () => showSidebar("archive") },
     { label: "Clear unpinned tabs", run: then("clearToday") },
     { label: "Show sidebar", run: () => showSidebar("tabs") },
-    { label: "New space", run: async () => { showSidebar("tabs", false); await send("addSpace"); await closeSelf(); } },
+    { label: "New tab group", run: async () => { showSidebar("tabs", false); await send("addSpace"); await closeSelf(); } },
     ...data.spaces.filter((s) => s.id !== data.activeSpaceId).map((s) => ({ label: `Go to ${s.name}`, run: async () => { await closeSelf(); await send("switchSpace", { id: s.id }); } })),
     ...data.archiveHours.filter((h) => h !== data.settings.archiveAfterHours).map((h) => ({ label: `Archive unpinned tabs after ${names[h]}`, rare: true, run: then("setSetting", { key: "archiveAfterHours", value: h }) })),
     { label: "Set up keyboard shortcuts", run: () => go("chrome://extensions/shortcuts") },
