@@ -13,6 +13,13 @@ Everything stays on this computer. The extension has no server and sends nothing
 5. Move the sidebar to the left: Chrome Settings, Appearance, Side panel position, **Show on left**.
 6. Open a new tab. Chrome asks if you meant to change the new tab page. Choose **Keep it**.
 
+What happens the moment you load it:
+
+- Every open tab that is not in a tab group is put into one group called "Home". That group is your first space.
+- Tabs you pinned in Chrome become favorites.
+- Nothing is closed. Tabs that were already open start counting as unused from the install time, so the first ones move to the archive 12 hours later at the earliest. Change that time in the archive view.
+- Local files, Chrome pages, and other extensions' pages are never archived, because the archive could not reopen them.
+
 After you change the code, press the reload arrow on the Portside card in `chrome://extensions`.
 
 ## What is in the sidebar

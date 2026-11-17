@@ -52,6 +52,16 @@ test("only idle, unpinned, silent, background tabs are archived", () => {
   assert.deepEqual(stale.map((t) => t.id), [1]);
 });
 
+test("tabs that were already open at install get a fresh start, and unsavable pages are left alone", () => {
+  const hour = 3600 * 1000;
+  const now = 100 * hour;
+  const old = (id, url = "https://x.dev") => ({ id, url, pinned: false, active: false, audible: false, lastAccessed: now - 400 * hour });
+  const opts = { linkedIds: new Set(), limitMs: 12 * hour, now };
+  assert.deepEqual(staleTabs([old(1)], { ...opts, since: now - hour }), [], "installed an hour ago: nothing is idle yet");
+  assert.deepEqual(staleTabs([old(1)], { ...opts, since: now - 13 * hour }).map((t) => t.id), [1], "13 hours after install the old tab goes");
+  assert.deepEqual(staleTabs([old(2, "file:///Users/me/report.pdf"), old(3, "chrome://settings/")], opts), [], "pages the archive cannot reopen stay");
+});
+
 test("archive days are named the way people say them", () => {
   const now = new Date(2026, 10, 16, 15).getTime();
   assert.equal(dayLabel(new Date(2026, 10, 16, 1).getTime(), now), "Today");

@@ -228,6 +228,64 @@ await check("a tab group made in Chrome's tab strip becomes a space", async (t) 
   assert.deepEqual(titles(view.today), ["Start"], "its tab leaves the current space's list");
 });
 
+await check("after a restart, pins, favorites, and spaces find their tabs again", async (t) => {
+  // A restart hands out new tab and group ids. Wiping what the extension
+  // remembers for this session is the same thing from its point of view.
+  const inbox = await t.open("mail", "Inbox", "inbox");
+  const sent = await t.open("mail", "Sent", "sent");
+  const pulls = await t.open("github", "Pull requests", "pulls");
+  await t.open("docs", "Loose tab");
+  await t.ask("move", { item: { kind: "tab", tabId: inbox }, to: { zone: "favs" } });
+  await t.ask("move", { item: { kind: "tab", tabId: sent }, to: { zone: "favs" } });
+  await t.ask("move", { item: { kind: "tab", tabId: pulls }, to: { zone: "pinned" } });
+  const work = await t.ask("addSpace", { name: "Work" });
+  const ticket = await t.open("jira", "Ticket");
+  await t.ask("move", { item: { kind: "tab", tabId: ticket }, to: { zone: "pinned" } });
+  const home = (await t.ask("view")).spaces[0].id;
+  await t.ask("switchSpace", { id: home });
+  const before = await until(t, (v) => v.space.id === home && v.pinned.length === 1 && v.favorites.length === 2, "setup");
+  const shape = (v) => ({
+    favorites: v.favorites.map((f) => [f.title, f.tabId]),
+    pinned: v.pinned.map((p) => [p.title, p.tabId]),
+    today: titles(v.today),
+    spaces: v.spaces.map((s) => s.name),
+  });
+
+  await t.worker.evaluate(() => chrome.storage.session.remove("sess"));
+  await t.ask("sync");
+  const after = await t.ask("view");
+  assert.deepEqual(shape(after), shape(before), "home should look the same, with each favorite on its own tab");
+  assert.deepEqual(after.favorites.map((f) => f.tabId), [inbox, sent], "two favorites on one site keep their own tabs");
+  assert.equal(after.spaces.length, 2, "no extra spaces appear");
+
+  await t.ask("switchSpace", { id: work });
+  const workView = await until(t, (v) => v.space.id === work, "switch to work");
+  assert.deepEqual(workView.pinned.map((p) => [p.title, p.tabId]), [["Ticket", ticket]], "the other space's pin is still tied to its tab");
+});
+
+await check("clear leaves open the pages the archive could not bring back", async (t) => {
+  await t.open("news", "Story");
+  await t.worker.evaluate((windowId) => chrome.tabs.create({ windowId, url: "chrome://version/" }).then(() => {}), t.mainWindowId);
+  await until(t, (v) => v.today.length === 3, "setup");
+  await t.ask("clearToday");
+  const view = await until(t, (v) => v.archiveCount === 2, "the two web pages should be archived");
+  assert.equal(view.today.length, 1, "the Chrome page stays open");
+  assert.match(view.today[0].url, /^chrome:\/\/version/);
+});
+
+await check("the new tab switch gives Chrome's own new tab page back", async (t) => {
+  await t.ask("setSetting", { key: "barOnNewTab", value: false });
+  await t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId);
+  let tabs = [];
+  for (let i = 0; i < 50 && !tabs.some((tab) => tab.active && /^chrome:\/\/new-tab-page/.test(tab.url)); i++) {
+    await t.settle(60);
+    tabs = await t.tabs();
+  }
+  const active = tabs.find((tab) => tab.active);
+  assert.match(active.url, /^chrome:\/\/new-tab-page/, "the new tab should be Chrome's page");
+  assert.ok(!tabs.some((tab) => tab.url.includes("bar/bar.html")), "the command bar should not open");
+});
+
 await check("copy link puts the clean link on the clipboard", async (t) => {
   // Headless Chromium keeps its own clipboard, so this never touches the Mac's.
   const tabId = await t.open("news", "Fees", "story");

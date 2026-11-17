@@ -110,18 +110,23 @@ async function syncNow(state, sess) {
     if (!live.has(tabId) || !entries.some((e) => e.id === entryId)) delete sess.links[entryId];
   }
   const linked = new Set(Object.values(sess.links));
-  for (const entry of entries) {
-    if (sess.links[entry.id] != null) continue;
-    const want = cleanUrl(entry.url);
-    const match = tabs.find((t) => {
-      if (linked.has(t.id) || isOurs(t.url)) return false;
-      const url = cleanUrl(t.pendingUrl || t.url || "");
-      if (entry.kind === "fav") return t.pinned && (url === want || hostOf(url) === hostOf(want));
-      return !t.pinned && url === want && spaceOfTab(state, sess, t) === entry.spaceId;
-    });
-    if (match) {
-      sess.links[entry.id] = match.id;
-      linked.add(match.id);
+  // Exact links first. Only then may a favorite claim a tab that wandered within
+  // its site, so two favorites on the same site cannot end up swapped.
+  for (const sameSite of [false, true]) {
+    for (const entry of entries) {
+      if (sess.links[entry.id] != null) continue;
+      if (sameSite && entry.kind !== "fav") continue;
+      const want = cleanUrl(entry.url);
+      const match = tabs.find((t) => {
+        if (linked.has(t.id) || isOurs(t.url)) return false;
+        const url = cleanUrl(t.pendingUrl || t.url || "");
+        if (entry.kind === "fav") return t.pinned && (sameSite ? hostOf(url) === hostOf(want) : url === want);
+        return !t.pinned && url === want && spaceOfTab(state, sess, t) === entry.spaceId;
+      });
+      if (match) {
+        sess.links[entry.id] = match.id;
+        linked.add(match.id);
+      }
     }
   }
   // A tab pinned with Chrome's own menu becomes a favorite.
@@ -174,9 +179,18 @@ function archiveRecord(state, sess, tab, reason) {
   if (state.archive.length > ARCHIVE_LIMIT) state.archive.length = ARCHIVE_LIMIT;
 }
 
-async function archiveTabs(state, sess, tabs, reason) {
-  for (const tab of tabs) archiveRecord(state, sess, tab, reason);
-  await safeRemove(tabs.map((t) => t.id));
+/**
+ * Archive tabs and close them. A page that is not a normal web link (a local
+ * file, a Chrome page, another extension's page) cannot be brought back from
+ * the archive, so it is left open unless the person closed that one tab themselves.
+ */
+async function archiveTabs(state, sess, tabs, reason, { closeUnsaved = false } = {}) {
+  const saved = tabs.filter((tab) => isWeb(tab.url));
+  for (const tab of saved) archiveRecord(state, sess, tab, reason);
+  // Write the archive before closing anything, so a crash cannot lose a tab.
+  if (saved.length) await chrome.storage.local.set({ state });
+  await safeRemove((closeUnsaved ? tabs : saved).map((t) => t.id));
+  return saved.length;
 }
 
 async function todayTabs(state, sess, windowId, spaceId = state.activeSpaceId) {
@@ -190,7 +204,7 @@ async function autoArchive() {
     const limit = state.settings.archiveAfterHours * 3600 * 1000;
     const linked = new Set(Object.values(sess.links));
     const tabs = await chrome.tabs.query({ windowType: "normal" });
-    const stale = staleTabs(tabs, { linkedIds: linked, limitMs: limit, isOurs });
+    const stale = staleTabs(tabs, { linkedIds: linked, limitMs: limit, since: state.installedAt || 0, isOurs });
     if (stale.length) await archiveTabs(state, sess, stale, "auto");
   });
 }
@@ -515,7 +529,7 @@ const handlers = {
       const fresh = await chrome.tabs.create({ windowId: tab.windowId, active: true });
       await putInSpace(state, sess, tab.windowId, state.activeSpaceId, [fresh.id]);
     }
-    await archiveTabs(state, sess, [tab], "manual");
+    await archiveTabs(state, sess, [tab], "manual", { closeUnsaved: true });
   }),
 
   closeEntryTab: change(async (state, sess, { id }) => {
@@ -596,7 +610,7 @@ const handlers = {
 
   closeCurrent: change(async (state, sess, { windowId }) => {
     const tab = await contextTab(sess, windowId);
-    if (tab) await archiveTabs(state, sess, [tab], "manual");
+    if (tab) await archiveTabs(state, sess, [tab], "manual", { closeUnsaved: true });
   }),
 
   addFolder: change((state, sess, { name }) => {
@@ -663,8 +677,8 @@ const handlers = {
 
   clearToday: change(async (state, sess, { windowId }) => {
     const tabs = await todayTabs(state, sess, windowId);
-    await archiveTabs(state, sess, tabs, "manual");
-    if (tabs.length) signal(tabs.length === 1 ? "1 tab archived" : `${tabs.length} tabs archived`);
+    const count = await archiveTabs(state, sess, tabs, "manual");
+    if (count) signal(count === 1 ? "1 tab archived" : `${count} tabs archived`);
   }),
 
   archiveList: async ({ q }) => {
@@ -779,11 +793,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "archive") autoArchive().catch(console.warn);
 });
 
-async function boot() {
+async function boot(details) {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   if (!(await chrome.alarms.get("archive"))) await chrome.alarms.create("archive", { periodInMinutes: 5 });
-  await mutate(syncNow).catch(console.warn);
+  await mutate(async (state, sess) => {
+    // Tabs that were already open do not start counting as idle until now.
+    if (details?.reason === "install" || !state.installedAt) state.installedAt = Date.now();
+    await syncNow(state, sess);
+  }).catch(console.warn);
 }
 
 chrome.runtime.onInstalled.addListener(boot);
-chrome.runtime.onStartup.addListener(boot);
+chrome.runtime.onStartup.addListener(() => boot());

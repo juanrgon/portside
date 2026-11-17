@@ -74,9 +74,12 @@ export function dayLabel(ms, now = Date.now()) {
 
 /**
  * Which tabs have sat unused long enough to archive. Pinned tabs, favorites,
- * the tab in front, and anything playing sound are never archived.
+ * the tab in front, anything playing sound, and pages that could not be
+ * reopened from a link are never archived. `since` is when the extension was
+ * installed: no tab counts as idle from before that, so installing it on a
+ * browser full of old tabs does not sweep them all away.
  */
-export function staleTabs(tabs, { linkedIds, limitMs, now = Date.now(), isOurs = () => false }) {
+export function staleTabs(tabs, { linkedIds, limitMs, now = Date.now(), since = 0, isOurs = () => false }) {
   return tabs.filter(
     (tab) =>
       !tab.pinned &&
@@ -84,7 +87,8 @@ export function staleTabs(tabs, { linkedIds, limitMs, now = Date.now(), isOurs =
       !tab.audible &&
       !linkedIds.has(tab.id) &&
       !isOurs(tab.url) &&
+      isWeb(tab.url) &&
       typeof tab.lastAccessed === "number" &&
-      now - tab.lastAccessed > limitMs,
+      now - Math.max(tab.lastAccessed, since) > limitMs,
   );
 }
