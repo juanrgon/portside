@@ -44,6 +44,10 @@ Good to know:
 
 **Store icon (128x128):** `extension/icons/icon128.png`
 
+**Small promo tile (440x280):** `store/promo-small-440x280.png`
+
+**Marquee promo tile (1400x560, optional):** `store/promo-marquee-1400x560.png`
+
 **Homepage URL:** https://github.com/juanrgon/portside
 
 **Support URL:** https://github.com/juanrgon/portside/issues

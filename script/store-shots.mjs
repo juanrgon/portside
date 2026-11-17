@@ -22,6 +22,29 @@ async function sideBySide(name, { pageHtml }) {
   await stage.close();
 }
 
+/** A promo tile: the name, one line, and the real sidebar peeking in from the right. */
+async function tile(name, panel, { width, height, scale }) {
+  const icon = readFileSync(new URL("../extension/icons/icon128.png", import.meta.url));
+  const stage = await t.context.newPage();
+  await stage.setViewportSize({ width, height });
+  const px = (n) => `${Math.round(n * scale)}px`;
+  await stage.setContent(`<!doctype html><meta charset="utf-8"><style>
+    body { margin: 0; width: ${width}px; height: ${height}px; overflow: hidden; position: relative;
+      font-family: -apple-system, system-ui, sans-serif; color: white;
+      background: linear-gradient(150deg, oklch(0.52 0.17 295), oklch(0.34 0.15 314)); }
+    .words { position: absolute; left: ${px(34)}; top: 50%; transform: translateY(-50%); width: ${px(215)}; }
+    .mark { width: ${px(40)}; height: ${px(40)}; display: block; margin-bottom: ${px(14)}; filter: drop-shadow(0 0 ${px(1)} oklch(1 0 0 / 0.55)) drop-shadow(0 ${px(4)} ${px(10)} oklch(0.2 0.1 300 / 0.4)); }
+    h1 { margin: 0; font-size: ${px(38)}; line-height: 1; font-weight: 800; letter-spacing: -0.03em; }
+    p { margin: ${px(10)} 0 0; font-size: ${px(15)}; line-height: 1.3; font-weight: 500; opacity: 0.86; }
+    .side { position: absolute; right: ${px(26)}; top: ${px(30)}; width: ${px(160)}; border-radius: ${px(12)};
+      box-shadow: 0 ${px(16)} ${px(44)} oklch(0.18 0.1 300 / 0.55); }
+  </style>
+  <div class="words"><img class="mark" src="data:image/png;base64,${icon.toString("base64")}"><h1>Portside</h1><p>Your tab groups, in a sidebar.</p></div>
+  <img class="side" src="data:image/png;base64,${panel.toString("base64")}">`);
+  await stage.screenshot({ path: new URL(`../${name}.png`, out).pathname });
+  await stage.close();
+}
+
 const article = (title, lines) => `<div style="max-width:620px;margin:0 auto;padding:72px 48px;color:#1d1b26">
   <p style="margin:0 0 10px;color:#6f6a80;font-size:15px">Launch plan</p>
   <h1 style="margin:0 0 22px;font-size:40px;line-height:1.12;letter-spacing:-0.02em">${title}</h1>
@@ -43,11 +66,16 @@ try {
   await t.ask("closeEntryTab", { id: view.pinned.find((p) => p.title === "Production logs").id });
   await t.ask("activateTab", { tabId: ids.docs });
   await t.settle(1200);
+  // One picture of the sidebar for the tiles, taken before anything else opens a tab.
+  const hero = await t.panel.screenshot();
   await sideBySide("1-sidebar", { pageHtml: article("Pinned tabs stay put. Everything else tidies itself up.", [
     "Keep the pages you use every day above the line. They stay there, and they never get archived.",
     "Tabs below the line are for today. Leave one alone long enough and it moves to the archive, where you can search for it and bring it back.",
     "Favorites along the top follow you into every tab group.",
   ]) });
+
+  await tile("promo-small-440x280", hero, { width: 440, height: 280, scale: 1 });
+  await tile("promo-marquee-1400x560", hero, { width: 1400, height: 560, scale: 2.1 });
 
   // 2: the command bar on a new tab
   const bar = await t.newTab();
