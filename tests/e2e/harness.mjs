@@ -78,6 +78,17 @@ export async function start({ colorScheme = "light", domain = "localhost" } = {}
     }, tabId);
     return tabId;
   };
+  /** Open a new tab the way Cmd+T does, and hand back the command bar page it turns into. */
+  const newTab = async (windowId = mainWindowId) => {
+    const known = new Set(context.pages());
+    await worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), windowId);
+    for (let i = 0; i < 200; i++) {
+      const page = context.pages().find((p) => !known.has(p) && p.url().includes("bar/bar.html?mode=tab"));
+      if (page) return page;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    throw new Error("the new tab never became the command bar");
+  };
   const tabs = () => worker.evaluate((windowId) => chrome.tabs.query({ windowId }), mainWindowId);
   const settle = (ms = 350) => panel.waitForTimeout(ms);
 
@@ -87,5 +98,5 @@ export async function start({ colorScheme = "light", domain = "localhost" } = {}
     rmSync(profile, { recursive: true, force: true });
   };
 
-  return { context, worker, id, panel, ask, open, tabs, settle, site, errors, stop, mainWindowId };
+  return { context, worker, id, panel, ask, open, newTab, tabs, settle, site, errors, stop, mainWindowId };
 }

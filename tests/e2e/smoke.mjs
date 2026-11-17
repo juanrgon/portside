@@ -79,10 +79,7 @@ try {
   await shot(t.panel, `space-two-${scheme}`);
 
   // the new tab page
-  const [newTab] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const newTab = await t.newTab();
   await newTab.waitForSelector(".hit");
   await newTab.setViewportSize({ width: 1100, height: 700 });
   await newTab.locator("#q").fill("git");

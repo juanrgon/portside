@@ -197,10 +197,7 @@ await check("command-bar-go-to-group", async (t) => {
   const work = await t.ask("addSpace", { name: "Work" });
   await t.open("work", "Work document");
   await t.ask("switchSpace", { id: home });
-  const [bar] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const bar = await t.newTab();
   await bar.waitForSelector(".hit");
   await bar.locator("#q").fill("Go to Work");
   await bar.waitForSelector(".hit.on:has-text('Go to Work')");
@@ -319,10 +316,7 @@ await check("command-bar-close-targets-other-window", async (t) => {
   await t.worker.evaluate(([id, windowId]) => chrome.tabs.move(id, { windowId, index: -1 }),
     [moved, secondWindow.id]);
   await nativeSync(t);
-  const [bar] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const bar = await t.newTab();
   await bar.waitForSelector(".hit");
   // The new-tab bar stays open when another, inactive tab is closed in Chrome.
   await t.worker.evaluate((id) => chrome.tabs.remove(id), first);

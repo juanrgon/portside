@@ -184,10 +184,7 @@ await check("the command bar switches to an open tab, and searches when nothing 
 
 await check("a new tab opens the command bar, and a link typed there loads in that tab", async (t) => {
   await until(t, (v) => v.today.length === 1, "setup");
-  const [bar] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const bar = await t.newTab();
   await bar.waitForSelector(".hit");
   assert.equal(await bar.evaluate(() => document.activeElement?.id), "q", "the cursor should be in the box");
   let view = await t.ask("view");
@@ -206,10 +203,7 @@ await check("escape on a new tab goes back to the tab you came from", async (t) 
   await t.open("news", "Other");
   await t.ask("activateTab", { tabId: from });
   await until(t, (v) => v.today.find((x) => x.tabId === from)?.active, "setup");
-  const [bar] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const bar = await t.newTab();
   await bar.waitForSelector(".hit");
   await Promise.all([bar.waitForEvent("close"), bar.keyboard.press("Escape")]);
   await until(t, (v) => v.today.find((x) => x.tabId === from)?.active, "escape should return to the earlier tab");
@@ -284,6 +278,32 @@ await check("the new tab switch gives Chrome's own new tab page back", async (t)
   const active = tabs.find((tab) => tab.active);
   assert.match(active.url, /^chrome:\/\/new-tab-page/, "the new tab should be Chrome's page");
   assert.ok(!tabs.some((tab) => tab.url.includes("bar/bar.html")), "the command bar should not open");
+});
+
+await check("a blank tab opened by another tool stays the same tab", async (t) => {
+  // Other extensions open a blank tab and then drive it by its id.
+  const create = (active) => t.worker.evaluate(([windowId, active]) => chrome.tabs.create({ windowId, active }).then((tab) => tab.id), [t.mainWindowId, active]);
+  const get = (id) => t.worker.evaluate((id) => chrome.tabs.get(id).catch(() => null), id);
+  const front = await create(true);
+  const back = await create(false);
+  for (let i = 0; i < 80 && !((await get(front))?.url || "").includes("bar/bar.html"); i++) await t.settle(50);
+  assert.match((await get(front)).url, /bar\/bar\.html\?mode=tab/, "the tab becomes the command bar without changing its id");
+  assert.ok(await get(back), "a blank tab opened in the background is left alone");
+
+  await t.worker.evaluate(([id, url]) => chrome.tabs.update(id, { url }), [front, t.site("store", "Dashboard")]);
+  await until(t, (v) => v.today.some((x) => x.tabId === front && x.title === "Dashboard"), "the tab can be sent to a page by its id");
+  await t.worker.evaluate(([id, url]) => chrome.tabs.update(id, { url, active: true }), [back, t.site("other", "Second")]);
+  await until(t, (v) => v.today.some((x) => x.tabId === back && x.title === "Second"), "so can the background one");
+  assert.ok(await get(front), "and switching away does not close a tab that has loaded a page");
+});
+
+await check("clicking away from an untouched new tab closes it", async (t) => {
+  const other = await t.open("docs", "Somewhere else");
+  const bar = await t.newTab();
+  await bar.waitForSelector(".hit");
+  const count = (await t.tabs()).length;
+  await Promise.all([bar.waitForEvent("close"), t.ask("activateTab", { tabId: other })]);
+  assert.equal((await t.tabs()).length, count - 1);
 });
 
 await check("copy link puts the clean link on the clipboard", async (t) => {

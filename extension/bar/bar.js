@@ -293,12 +293,9 @@ if (mode === "window") {
   window.addEventListener("blur", () => {
     if (!leaving) window.close();
   });
-} else {
-  // Clicking away from an untouched new tab throws it away, the way the bar would close.
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden && !leaving && !input.value && selfTab) chrome.tabs.remove(selfTab.id).catch(() => {});
-  });
 }
+// An untouched new tab that the person clicks away from is tidied up by the
+// background worker, which can tell a tab that was left from one that is loading a page.
 
 (async () => {
   if (mode === "tab") {

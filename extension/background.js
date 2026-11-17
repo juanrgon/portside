@@ -884,6 +884,13 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   mutate(async (state, sess) => {
     const prev = sess.prev[windowId] || [];
     sess.prev[windowId] = [tabId, ...prev.filter((id) => id !== tabId)].slice(0, 6);
+    // The tab just left was an untouched command bar: throw it away, the way the
+    // bar would close. A bar tab that is on its way to a page, or that was never
+    // in front (another tool opened it in the background), is left alone.
+    const left = prev[0] != null && prev[0] !== tabId ? await chrome.tabs.get(prev[0]).catch(() => null) : null;
+    if (left && left.windowId === windowId && (left.url || "").startsWith(`${BAR_URL}?mode=tab`) && (!left.pendingUrl || left.pendingUrl === left.url)) {
+      await chrome.tabs.remove(left.id).catch(() => {});
+    }
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (!tab || tab.pinned || tab.groupId === -1) return;
     // Clicking a tab that lives in another tab group takes this window's sidebar there too.

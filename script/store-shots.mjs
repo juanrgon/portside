@@ -50,10 +50,7 @@ try {
   ]) });
 
   // 2: the command bar on a new tab
-  const [bar] = await Promise.all([
-    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
-    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
-  ]);
+  const bar = await t.newTab();
   await bar.waitForSelector(".hit");
   await bar.setViewportSize({ width: 1280, height: 800 });
   await bar.locator("#q").fill("pu");
