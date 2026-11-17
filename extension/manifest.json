@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Portside",
+  "version": "0.1.0",
+  "description": "A sidebar with spaces, pinned tabs, a command bar, and tabs that tidy themselves up. Everything stays on this computer.",
+  "minimum_chrome_version": "121",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "sidePanel",
+    "storage",
+    "alarms",
+    "favicon",
+    "clipboardWrite",
+    "offscreen",
+    "search"
+  ],
+  "optional_permissions": ["history"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "panel/panel.html" },
+  "action": {
+    "default_title": "Show or hide the sidebar",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "chrome_url_overrides": { "newtab": "bar/newtab.html" },
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": { "default": "Ctrl+Shift+S", "mac": "Command+S" },
+      "description": "Show or hide the sidebar"
+    },
+    "copy-url": {
+      "suggested_key": { "default": "Alt+Shift+C", "mac": "Alt+Shift+C" },
+      "description": "Copy the current tab's link, without tracking codes"
+    },
+    "command-bar": {
+      "suggested_key": { "default": "Ctrl+Shift+K", "mac": "Command+Shift+K" },
+      "description": "Open the command bar over the current tab"
+    },
+    "last-tab": {
+      "suggested_key": { "default": "Alt+Q", "mac": "Alt+Q" },
+      "description": "Jump back to the tab you were on before"
+    },
+    "next-space": { "description": "Go to the next space" },
+    "previous-space": { "description": "Go to the previous space" },
+    "pin-tab": { "description": "Pin or unpin the current tab" },
+    "clear-today": { "description": "Archive every unpinned tab in this space" }
+  }
+}

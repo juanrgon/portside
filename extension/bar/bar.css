@@ -1,0 +1,79 @@
+body {
+  min-height: 100%;
+  background: linear-gradient(168deg, var(--wash-a), var(--wash-b));
+  color: var(--lifted-ink);
+  user-select: none;
+}
+
+.bar {
+  width: min(680px, calc(100vw - 32px));
+  margin: 17vh auto 0;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--sheet);
+  box-shadow: 0 24px 70px oklch(0.2 0.06 var(--hue) / 0.3), 0 0 0 0.5px oklch(0.2 0.06 var(--hue) / 0.18);
+}
+body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 0.06 var(--hue) / 0.18); }
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 14px;
+}
+.lead { display: grid; place-items: center; width: 20px; height: 20px; color: var(--ink-soft); }
+.lead img { width: 18px; height: 18px; border-radius: 4px; }
+.lead .icon { width: 18px; height: 18px; }
+#q {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  user-select: text;
+}
+#q::placeholder { color: var(--ink-faint); font-weight: 400; }
+
+.results { padding-top: 6px; border-top: 1px solid var(--line); }
+.results:empty { display: none; }
+
+.hit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 12px 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.hit .glyph { display: grid; place-items: center; width: 20px; height: 20px; flex: none; color: var(--ink-soft); }
+.hit .glyph img { width: 16px; height: 16px; border-radius: 3px; }
+.hit .text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hit .title { font-weight: 500; }
+.hit .sub { color: var(--ink-soft); }
+.hit .side { display: flex; align-items: center; gap: 8px; flex: none; color: var(--ink-faint); font-size: 12px; }
+.hit kbd {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--line);
+  font: inherit;
+  font-size: 11px;
+}
+.hit .go {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--line);
+}
+.hit .go .icon { width: 13px; height: 13px; }
+.hit.on { background: var(--accent); color: var(--accent-ink); }
+.hit.on .glyph, .hit.on .sub, .hit.on .side { color: inherit; }
+.hit.on .sub, .hit.on .side { opacity: 0.8; }
+.hit.on kbd, .hit.on .go { background: oklch(1 0 0 / 0.22); }
+.group { padding: 8px 14px 4px; color: var(--ink-soft); font-size: 11px; font-weight: 600; }

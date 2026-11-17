@@ -1,0 +1,63 @@
+/* One tint per space. The color names are Chrome's tab group colors, so the
+   sidebar and the group in the tab strip always match. */
+
+:root {
+  --hue: 300;
+  --chroma: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-color="grey"] { --hue: 260; --chroma: 0.12; }
+[data-color="blue"] { --hue: 255; }
+[data-color="red"] { --hue: 22; }
+[data-color="yellow"] { --hue: 92; }
+[data-color="green"] { --hue: 152; }
+[data-color="pink"] { --hue: 350; }
+[data-color="purple"] { --hue: 300; }
+[data-color="cyan"] { --hue: 212; }
+[data-color="orange"] { --hue: 58; }
+
+[data-color] {
+  --wash-a: oklch(0.84 calc(0.085 * var(--chroma)) var(--hue));
+  --wash-b: oklch(0.76 calc(0.115 * var(--chroma)) calc(var(--hue) + 12));
+  --ink: oklch(0.26 calc(0.07 * var(--chroma)) var(--hue));
+  --ink-soft: oklch(0.26 calc(0.07 * var(--chroma)) var(--hue) / 0.62);
+  --ink-faint: oklch(0.26 calc(0.07 * var(--chroma)) var(--hue) / 0.38);
+  --glass: oklch(1 0 0 / 0.26);
+  --glass-strong: oklch(1 0 0 / 0.42);
+  --lifted: oklch(1 0 0 / 0.94);
+  --lifted-ink: oklch(0.22 calc(0.05 * var(--chroma)) var(--hue));
+  --line: oklch(0.26 calc(0.07 * var(--chroma)) var(--hue) / 0.16);
+  --accent: oklch(0.52 calc(0.16 * var(--chroma)) var(--hue));
+  --accent-ink: oklch(0.99 0 0);
+  --sheet: oklch(0.985 calc(0.008 * var(--chroma)) var(--hue));
+  --shadow: 0 1px 2px oklch(0.2 0.05 var(--hue) / 0.16), 0 0 0 0.5px oklch(0.2 0.05 var(--hue) / 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color] {
+    --wash-a: oklch(0.3 calc(0.055 * var(--chroma)) var(--hue));
+    --wash-b: oklch(0.23 calc(0.06 * var(--chroma)) calc(var(--hue) + 12));
+    --ink: oklch(0.95 calc(0.02 * var(--chroma)) var(--hue));
+    --ink-soft: oklch(0.95 calc(0.02 * var(--chroma)) var(--hue) / 0.66);
+    --ink-faint: oklch(0.95 calc(0.02 * var(--chroma)) var(--hue) / 0.4);
+    --glass: oklch(1 0 0 / 0.08);
+    --glass-strong: oklch(1 0 0 / 0.14);
+    --lifted: oklch(1 0 0 / 0.2);
+    --lifted-ink: oklch(0.99 0 0);
+    --line: oklch(1 0 0 / 0.14);
+    --accent: oklch(0.7 calc(0.14 * var(--chroma)) var(--hue));
+    --accent-ink: oklch(0.18 0.03 var(--hue));
+    --sheet: oklch(0.24 calc(0.03 * var(--chroma)) var(--hue));
+    --shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 0 0 0.5px oklch(1 0 0 / 0.08);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.icon { width: 16px; height: 16px; flex: none; display: block; }
