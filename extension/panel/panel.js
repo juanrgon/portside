@@ -227,10 +227,14 @@ function endDrag() {
   clearDropMarks();
 }
 
-function clearDropMarks() {
-  app.querySelectorAll(".drop-line").forEach((el) => el.remove());
-  app.querySelectorAll(".drop-before, .drop-after, .drop-into").forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-into"));
+function clearDropMarks(keep) {
+  app.querySelectorAll(".drop-line").forEach((el) => el !== keep && el.remove());
+  app.querySelectorAll(".drop-before, .drop-after, .drop-into").forEach((el) => el !== keep && el.classList.remove("drop-before", "drop-after", "drop-into"));
 }
+
+// Every drop target stops the event, so a dragover that reaches the page means
+// the pointer is over nothing that takes a drop.
+document.addEventListener("dragover", () => drag && clearDropMarks());
 
 function isSelf(el) {
   if (!drag) return false;
@@ -256,17 +260,16 @@ function dropList(zone) {
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
-      clearDropMarks();
       const list = event.currentTarget;
       const spot = listSpot(list, event.clientY);
       const firstFolder = [...list.children].find((el) => el.matches(".folder"));
       // Folders sit under the loose pins, so a pin can never land below one.
       const top = firstFolder && spot.top > firstFolder.offsetTop ? firstFolder.offsetTop : spot.top;
-      list.append(h("div", { class: "drop-line", style: `top:${top}px` }));
+      let line = [...list.children].find((el) => el.matches(".drop-line"));
+      if (!line) list.append((line = h("div", { class: "drop-line" })));
+      line.style.top = `${top}px`;
+      clearDropMarks(line);
       list.dataset.dropIndex = String(spot.index);
-    },
-    ondragleave: (event) => {
-      if (!event.currentTarget.contains(event.relatedTarget)) clearDropMarks();
     },
     ondrop: (event) => {
       if (!drag) return;
@@ -286,10 +289,9 @@ function dropInto(to, canTake = () => true) {
       if (!drag || !canTake(drag)) return;
       event.preventDefault();
       event.stopPropagation();
-      clearDropMarks();
+      clearDropMarks(event.currentTarget);
       event.currentTarget.classList.add("drop-into");
     },
-    ondragleave: (event) => event.currentTarget.classList.remove("drop-into"),
     ondrop: (event) => {
       if (!drag || !canTake(drag)) return;
       event.preventDefault();
@@ -305,6 +307,7 @@ const favDrop = {
   ondragover: (event) => {
     if (!drag) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     clearDropMarks();
     const grid = event.currentTarget;
@@ -321,9 +324,6 @@ const favDrop = {
     }
     if (index === tiles.length && tiles.length) tiles[tiles.length - 1].classList.add("drop-after");
     grid.dataset.dropIndex = String(index);
-  },
-  ondragleave: (event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) clearDropMarks();
   },
   ondrop: (event) => {
     if (!drag) return;
@@ -562,7 +562,7 @@ async function archiveBody() {
     if (next !== label) out.push(h("div", { class: "day" }, (label = next)));
     out.push(h("div", { class: "row old", role: "button", tabIndex: 0, title: item.url, onclick: () => { mode = "tabs"; act("restoreArchived", { id: item.id }); }, onkeydown: (e) => e.key === "Enter" && act("restoreArchived", { id: item.id }) },
       favicon(item.url),
-      h("div", { class: "text" }, h("span", { class: "title" }, item.title), h("span", { class: "sub" }, [hostOf(item.url), item.space].filter(Boolean).join("  ·  "))),
+      h("div", { class: "text" }, h("span", { class: "title" }, item.title), h("span", { class: "sub" }, item.space ? `${hostOf(item.url)}, in ${item.space}` : hostOf(item.url))),
     ));
   }
   if (!items.length) out.push(h("div", { class: "hint" }, archiveQuery ? "No archived tabs match that." : "Nothing here yet. Tabs you close or stop using land here, so you can get them back."));

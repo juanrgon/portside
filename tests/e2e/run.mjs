@@ -18,6 +18,7 @@ async function check(name, fn) {
     console.log(`✔ ${name}`);
   } catch (error) {
     results.push([name, false]);
+    if (t.errors.length) console.log(`  logged: ${t.errors.join(" | ")}`);
     console.log(`✖ ${name}\n  ${String(error.stack || error).split("\n").slice(0, 14).join("\n  ")}`);
   } finally {
     await t.stop();
@@ -225,6 +226,45 @@ await check("a tab group made in Chrome's tab strip becomes a space", async (t) 
   const view = await until(t, (v) => v.spaces.some((s) => s.name === "Shopping"), "the group should show up as a space");
   assert.equal(view.spaces.find((s) => s.name === "Shopping").color, "green");
   assert.deepEqual(titles(view.today), ["Start"], "its tab leaves the current space's list");
+});
+
+await check("copy link puts the clean link on the clipboard", async (t) => {
+  // Headless Chromium keeps its own clipboard, so this never touches the Mac's.
+  const tabId = await t.open("news", "Fees", "story");
+  await t.worker.evaluate(([id, url]) => chrome.tabs.update(id, { url }), [tabId, `${t.site("news", "Fees", "story")}&utm_source=mail&fbclid=zzz`]);
+  await until(t, (v) => v.activeUrl.includes("fbclid"), "the tab should be on the link with tracking codes");
+  await t.panel.locator(".link .chip[title='Copy link']").click();
+  await t.panel.locator("#toast.show", { hasText: "Link copied" }).waitFor();
+  await t.context.grantPermissions(["clipboard-read"]);
+  const reader = await t.context.newPage();
+  await reader.goto(t.site("reader", "Reader"));
+  await reader.bringToFront();
+  assert.equal(await reader.evaluate(() => navigator.clipboard.readText()), t.site("news", "Fees", "story"));
+});
+
+await check("dragging a pinned tab shows where it will land and reorders the pins", async (t) => {
+  const one = await t.open("a", "One");
+  const two = await t.open("b", "Two");
+  const three = await t.open("c", "Three");
+  for (const tabId of [one, two, three]) await t.ask("move", { item: { kind: "tab", tabId }, to: { zone: "pinned" } });
+  await until(t, (v) => v.pinned.length === 3, "setup");
+  await t.panel.locator(".list.pins > .row").nth(2).waitFor();
+  const from = await row(t, "Three").boundingBox();
+  const to = await row(t, "One").boundingBox();
+  await t.panel.mouse.move(from.x + 80, from.y + 10);
+  await t.panel.mouse.down();
+  for (let i = 0; i < 4; i++) await t.panel.mouse.move(to.x + 80 + i, to.y + 6, { steps: 2 });
+  await t.panel.locator(".drop-line").waitFor();
+  await t.panel.mouse.up();
+  const view = await until(t, (v) => v.pinned[0].title === "Three", "the dragged pin should move to the top");
+  assert.deepEqual(titles(view.pinned), ["Three", "One", "Two"]);
+});
+
+await check("the sidebar shortcut closes a sidebar that is already open", async (t) => {
+  await t.settle(600);
+  const closed = t.panel.waitForEvent("close", { timeout: 5000 }).then(() => true, () => false);
+  await t.worker.evaluate((windowId) => chrome.runtime.sendMessage({ type: "panel:toggle", windowId }).catch(() => {}), t.mainWindowId);
+  assert.equal(await closed, true);
 });
 
 const failed = results.filter(([, ok]) => !ok);

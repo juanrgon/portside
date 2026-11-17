@@ -54,7 +54,7 @@ body.window .bar { width: auto; margin: 10px; box-shadow: 0 0 0 0.5px oklch(0.2 
 .hit .glyph img { width: 16px; height: 16px; border-radius: 3px; }
 .hit .text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .hit .title { font-weight: 500; }
-.hit .sub { color: var(--ink-soft); }
+.hit .sub { margin-left: 10px; color: var(--ink-soft); }
 .hit .side { display: flex; align-items: center; gap: 8px; flex: none; color: var(--ink-faint); font-size: 12px; }
 .hit kbd {
   padding: 2px 6px;

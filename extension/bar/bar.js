@@ -125,7 +125,7 @@ function actions() {
     { label: "Show sidebar", run: () => showSidebar("tabs") },
     { label: "New space", run: async () => { showSidebar("tabs", false); await send("addSpace"); await closeSelf(); } },
     ...data.spaces.filter((s) => s.id !== data.activeSpaceId).map((s) => ({ label: `Go to ${s.name}`, run: async () => { await closeSelf(); await send("switchSpace", { id: s.id }); } })),
-    ...data.archiveHours.filter((h) => h !== data.settings.archiveAfterHours).map((h) => ({ label: `Archive unpinned tabs after ${names[h]}`, run: then("setSetting", { key: "archiveAfterHours", value: h }) })),
+    ...data.archiveHours.filter((h) => h !== data.settings.archiveAfterHours).map((h) => ({ label: `Archive unpinned tabs after ${names[h]}`, rare: true, run: then("setSetting", { key: "archiveAfterHours", value: h }) })),
     { label: "Set up keyboard shortcuts", run: () => go("chrome://extensions/shortcuts") },
     !data.history && { label: "Search my browsing history too", run: askForHistory },
   ].filter(Boolean);
@@ -167,7 +167,8 @@ function build(q) {
   }
   for (const action of actions()) {
     const s = score(text, action.label, "");
-    if (s) found.push({ ...actionHit(action), s });
+    // Settings are still findable, but they should not outrank the thing people do every day.
+    if (s) found.push({ ...actionHit(action), s: action.rare ? Math.min(s, 55) : s });
   }
   const open = new Set([...data.tabs, ...data.entries].map((x) => x.url));
   for (const item of historyFor === text ? historyHits : []) {
@@ -206,7 +207,7 @@ function render() {
   list.replaceChildren(
     ...hits.map((hit, index) => {
       const glyph = el("span", "glyph", hit.kind === "action" ? icon("bolt") : hit.kind === "search" ? icon("search") : hit.kind === "go" ? icon("globe") : favicon(hit.url, hit.icon));
-      const text = el("span", "text", el("span", "title", hit.title), hit.sub ? el("span", "sub", `  —  ${hit.sub}`) : null);
+      const text = el("span", "text", el("span", "title", hit.title), hit.sub ? el("span", "sub", hit.sub) : null);
       const side = el("span", "side", hit.keys ? el("kbd", "", hit.keys) : null, hit.side || null, hit.side ? el("span", "go", icon("arrow")) : null);
       const row = el("div", `hit${index === selected ? " on" : ""}`, glyph, text, side);
       row.setAttribute("role", "option");

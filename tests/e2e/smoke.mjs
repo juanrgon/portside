@@ -22,6 +22,72 @@ try {
   await t.ask("activateTab", { tabId: ids.docs });
   await t.settle(700);
   await shot(t.panel, `panel-${scheme}`);
+
+  // context menu on a pinned tab
+  await t.panel.locator(".row", { hasText: "Pull requests" }).click({ button: "right" });
+  await t.settle(200);
+  await shot(t.panel, `menu-${scheme}`);
+  await t.panel.keyboard.press("Escape");
+
+  // space options
+  await t.panel.locator(".space-head").hover();
+  await t.panel.locator(".space-head .chip").click();
+  await t.settle(200);
+  await shot(t.panel, `space-menu-${scheme}`);
+  await t.panel.keyboard.press("Escape");
+
+  // mid-drag
+  const box = await t.panel.locator(".row", { hasText: "IndexedDB API" }).boundingBox();
+  const target = await t.panel.locator(".row", { hasText: "Deployments" }).boundingBox();
+  await t.panel.mouse.move(box.x + 60, box.y + 12);
+  await t.panel.mouse.down();
+  await t.panel.mouse.move(box.x + 70, box.y - 40, { steps: 4 });
+  await t.panel.mouse.move(target.x + 80, target.y + 30, { steps: 6 });
+  await t.settle(200);
+  await shot(t.panel, `drag-${scheme}`);
+  await t.panel.mouse.move(box.x + 60, box.y + 12, { steps: 4 });
+  await t.panel.mouse.up();
+  await t.settle(300);
+
+  // command bar over the current tab
+  const [bar] = await Promise.all([t.context.waitForEvent("page"), t.ask("openBar")]);
+  await bar.waitForSelector(".hit");
+  await bar.setViewportSize({ width: 720, height: 440 });
+  await shot(bar, `bar-empty-${scheme}`);
+  await bar.locator("#q").fill("mo");
+  await t.settle(250);
+  await shot(bar, `bar-typed-${scheme}`);
+  await bar.locator("#q").fill("archive");
+  await t.settle(250);
+  await shot(bar, `bar-actions-${scheme}`);
+  await bar.close().catch(() => {});
+
+  // archive
+  await t.ask("closeTab", { tabId: ids.news });
+  await t.ask("closeTab", { tabId: ids.so });
+  await t.panel.locator(".foot .chip[title='Archived tabs']").click();
+  await t.settle(300);
+  await shot(t.panel, `archive-${scheme}`);
+  await t.panel.locator(".sheet-head .chip").click();
+
+  // a second space, in another color
+  await t.ask("addSpace", { name: "Reading" });
+  await t.ask("updateSpace", { id: (await t.ask("view")).space.id, patch: { icon: "📚", color: "green" } });
+  await t.open("longform", "The case for vertical tabs");
+  await t.open("blog", "Notes on focus");
+  await t.settle(600);
+  await shot(t.panel, `space-two-${scheme}`);
+
+  // the new tab page
+  const [newTab] = await Promise.all([
+    t.context.waitForEvent("page", (page) => page.url().includes("bar/bar.html")),
+    t.worker.evaluate((windowId) => chrome.tabs.create({ windowId }).then(() => {}), t.mainWindowId),
+  ]);
+  await newTab.waitForSelector(".hit");
+  await newTab.setViewportSize({ width: 1100, height: 700 });
+  await newTab.locator("#q").fill("git");
+  await t.settle(250);
+  await shot(newTab, `newtab-${scheme}`);
   console.log("groups", JSON.stringify(await t.worker.evaluate(() => chrome.tabGroups.query({}))));
   console.log("errors", t.errors);
 } finally { await t.stop(); }
