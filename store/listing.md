@@ -44,7 +44,9 @@ Good to know:
 
 **Store icon (128x128):** `extension/icons/icon128.png`
 
-**Homepage and support URL:** the GitHub repository
+**Homepage URL:** https://github.com/juanrgon/portside
+
+**Support URL:** https://github.com/juanrgon/portside/issues
 
 ## Privacy tab
 
@@ -73,10 +75,10 @@ Portside is a tab manager. It shows the current tab group in the side panel, kee
 
 Certify all three: no sale or transfer to third parties, no use unrelated to the single purpose, no use for creditworthiness or lending.
 
-**Privacy policy URL:** a public link to `PRIVACY.md`
+**Privacy policy URL:** https://github.com/juanrgon/portside/blob/main/PRIVACY.md
 
 ## Distribution tab
 
-**Visibility:** Unlisted to start. Anyone with the link can install it, but it does not show in search. Switch to Public later from the same tab.
+**Visibility:** Public
 
 **Regions:** all

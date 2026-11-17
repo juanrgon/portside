@@ -41,4 +41,4 @@ If this policy changes, the new version will be posted here with a new date.
 
 ## Contact
 
-Open an issue on the project's GitHub page.
+Open an issue at https://github.com/juanrgon/portside/issues
