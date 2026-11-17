@@ -9,6 +9,42 @@ const ORIGIN = chrome.runtime.getURL("");
 const BAR_URL = chrome.runtime.getURL("bar/bar.html");
 // The command bar's own tab, and the blank new tab page it replaces, are not "tabs" to list or archive.
 const isOurs = (url) => (url || "").startsWith(ORIGIN) || url === "chrome://newtab/";
+// Where a tab is, or is on its way to. A tab still loading its first page has only a pending link.
+const urlOf = (tab) => (isWeb(tab.pendingUrl) ? tab.pendingUrl : tab.url) || "";
+
+/** Each window shows its own tab group. A window that has not picked one uses the last one picked anywhere. */
+function activeOf(state, sess, windowId) {
+  const id = sess.active?.[windowId];
+  return state.spaces.some((s) => s.id === id) ? id : state.activeSpaceId;
+}
+
+function setActive(state, sess, windowId, spaceId) {
+  (sess.active ||= {})[windowId] = spaceId;
+  state.activeSpaceId = spaceId;
+}
+
+/** Forget which tab a saved entry had open. */
+function unlink(state, sess, entryId) {
+  delete sess.links[entryId];
+  const entry = [...state.favorites, ...state.pinned].find((e) => e.id === entryId);
+  if (entry) delete entry.live;
+}
+
+/**
+ * Remember, in storage that survives a restart, which page each open saved tab
+ * is on. After a restart that is how a pin finds its tab again, even one that
+ * wandered off its saved page. A pin whose tab was closed has no such note, so
+ * it never claims somebody else's tab.
+ */
+async function stampLive(state, sess) {
+  const ids = Object.values(sess.links);
+  if (!ids.length) return;
+  const byId = new Map((await chrome.tabs.query({})).map((t) => [t.id, t]));
+  for (const entry of [...state.favorites, ...state.pinned]) {
+    const tab = byId.get(sess.links[entry.id]);
+    if (tab && isWeb(urlOf(tab))) entry.live = cleanUrl(urlOf(tab));
+  }
+}
 
 // ---------------------------------------------------------------- spaces ↔ tab groups
 
@@ -22,9 +58,11 @@ function uniqueName(state, wanted, exceptId) {
 }
 
 /**
- * Line up spaces with the tab groups in one window. A space is a tab group.
- * Group ids change after a restart, so a lost id is found again by its title.
- * A titled group nobody owns becomes a new space.
+ * Line up saved tab groups with Chrome's tab groups in one window. Group ids
+ * change after a restart, so a lost id is found again by the title the group
+ * has in Chrome (and its color, when two groups share a title). Any group
+ * nobody owns, titled or not, becomes a new saved group, so its tabs are never
+ * mistaken for another group's.
  */
 async function resolveGroups(state, sess, windowId) {
   const groups = await chrome.tabGroups.query({ windowId });
@@ -34,29 +72,57 @@ async function resolveGroups(state, sess, windowId) {
     if (!state.spaces.some((s) => s.id === spaceId) || !byId.has(map[spaceId])) delete map[spaceId];
   }
   const used = new Set(Object.values(map));
-  for (const space of state.spaces) {
-    if (map[space.id] != null) continue;
-    const match = groups.find((g) => g.title === space.name && !used.has(g.id));
-    if (match) {
-      map[space.id] = match.id;
-      used.add(match.id);
+  for (const sameColor of [true, false]) {
+    for (const space of state.spaces) {
+      if (map[space.id] != null) continue;
+      const title = space.groupTitle ?? space.name;
+      const match = groups.find((g) => !used.has(g.id) && (g.title || "") === title && (!sameColor || g.color === space.color));
+      if (match) {
+        map[space.id] = match.id;
+        used.add(match.id);
+      }
     }
   }
-  for (const space of state.spaces) {
-    // The group was renamed or recolored in Chrome's own tab strip: follow it.
-    const group = byId.get(map[space.id]);
-    if (!group) continue;
-    if (group.title && group.title !== space.name) space.name = uniqueName(state, group.title, space.id);
-    if (group.color !== space.color) space.color = group.color;
-  }
   for (const group of groups) {
-    if (used.has(group.id) || !group.title) continue;
-    const space = { id: uid(), name: uniqueName(state, group.title), icon: "", color: group.color };
+    if (used.has(group.id)) continue;
+    const space = { id: uid(), name: uniqueName(state, group.title || "Untitled"), groupTitle: group.title || "", icon: "", color: group.color };
     state.spaces.push(space);
     map[space.id] = group.id;
     used.add(group.id);
   }
   return map;
+}
+
+/**
+ * A group renamed or recolored in Chrome's own tab strip: the saved group
+ * follows it, and so do that group's twins in other windows. The group that
+ * differs from what was last saved is the one the person just changed.
+ */
+async function followGroups(state, sess) {
+  for (const space of state.spaces) {
+    const groups = [];
+    for (const map of Object.values(sess.groups)) {
+      if (map[space.id] == null) continue;
+      const group = await chrome.tabGroups.get(map[space.id]).catch(() => null);
+      if (group) groups.push(group);
+    }
+    if (!groups.length) continue;
+    const known = space.groupTitle ?? space.name;
+    const changed = groups.find((g) => (g.title || "") !== known || g.color !== space.color);
+    if (!changed) {
+      space.groupTitle = known;
+      continue;
+    }
+    if ((changed.title || "") !== known) {
+      space.groupTitle = changed.title || "";
+      if (changed.title) space.name = uniqueName(state, changed.title, space.id);
+    }
+    space.color = changed.color;
+    for (const group of groups) {
+      if (group.id === changed.id) continue;
+      await chrome.tabGroups.update(group.id, { title: space.groupTitle, color: space.color }).catch(() => {});
+    }
+  }
 }
 
 async function putInSpace(state, sess, windowId, spaceId, tabIds) {
@@ -73,7 +139,7 @@ async function putInSpace(state, sess, windowId, spaceId, tabIds) {
     }
   }
   groupId = await chrome.tabs.group({ tabIds, createProperties: { windowId } });
-  await chrome.tabGroups.update(groupId, { title: space.name, color: space.color });
+  await chrome.tabGroups.update(groupId, { title: space.groupTitle ?? space.name, color: space.color });
   map[space.id] = groupId;
 }
 
@@ -81,7 +147,7 @@ function spaceOfTab(state, sess, tab) {
   if (tab.pinned) return null;
   const map = sess.groups[tab.windowId] || {};
   const hit = Object.entries(map).find(([, groupId]) => groupId === tab.groupId);
-  return hit ? hit[0] : state.activeSpaceId;
+  return hit ? hit[0] : activeOf(state, sess, tab.windowId);
 }
 
 // ---------------------------------------------------------------- keeping things in step
@@ -90,53 +156,95 @@ function allEntries(state) {
   return [...state.favorites.map((e) => ({ ...e, kind: "fav" })), ...state.pinned.map((e) => ({ ...e, kind: "pin" }))];
 }
 
-/** Group loose tabs, forget dead links, and re-link saved tabs after a restart. */
+/** Group loose tabs, follow what Chrome's own menus changed, and re-link saved tabs after a restart. */
 async function syncNow(state, sess) {
+  // Session storage starts empty after a restart. For the next minute, while
+  // Chrome is still restoring tabs, pins may look for the tab they had open.
+  if (sess.recoverUntil == null) sess.recoverUntil = Date.now() + 60 * 1000;
+  const recovering = Date.now() < sess.recoverUntil;
+
   const windows = await chrome.windows.getAll({ windowTypes: ["normal"], populate: true });
+  for (const win of windows) {
+    const map = await resolveGroups(state, sess, win.id);
+    // A window that has not picked a tab group yet shows the one its front tab is in.
+    // Without this, switching groups in one window would drag every other window along.
+    if (!state.spaces.some((sp) => sp.id === sess.active?.[win.id])) {
+      const front = win.tabs.find((t) => t.active && !t.pinned);
+      const owner = front && Object.entries(map).find(([, groupId]) => groupId === front.groupId)?.[0];
+      (sess.active ||= {})[win.id] = owner || state.activeSpaceId;
+    }
+  }
+  await followGroups(state, sess);
   const tabs = [];
   for (const win of windows) {
-    await resolveGroups(state, sess, win.id);
     const loose = win.tabs.filter((t) => !t.pinned && t.groupId === -1).map((t) => t.id);
     try {
-      await putInSpace(state, sess, win.id, state.activeSpaceId, loose);
+      await putInSpace(state, sess, win.id, activeOf(state, sess, win.id), loose);
     } catch {
       // Chrome refuses to move tabs while one is being dragged. The next event retries.
     }
-    tabs.push(...win.tabs);
+    tabs.push(...(loose.length ? await chrome.tabs.query({ windowId: win.id }) : win.tabs));
   }
   const live = new Map(tabs.map((t) => [t.id, t]));
-  const entries = allEntries(state);
   for (const [entryId, tabId] of Object.entries(sess.links)) {
-    if (!live.has(tabId) || !entries.some((e) => e.id === entryId)) delete sess.links[entryId];
+    if (!live.has(tabId) || !allEntries(state).some((e) => e.id === entryId)) unlink(state, sess, entryId);
   }
+  const owner = (tab) => Object.entries(sess.groups[tab.windowId] || {}).find(([, groupId]) => groupId === tab.groupId)?.[0] || null;
+
+  // Chrome's own menus can pin, unpin, or move a saved tab. Follow what Chrome shows.
+  for (const pin of [...state.pinned]) {
+    const tab = live.get(sess.links[pin.id]);
+    if (!tab) continue;
+    if (tab.pinned) {
+      state.pinned = state.pinned.filter((e) => e !== pin);
+      delete pin.spaceId;
+      delete pin.folderId;
+      state.favorites.push(pin);
+    } else if (owner(tab) && owner(tab) !== pin.spaceId) {
+      pin.spaceId = owner(tab);
+      pin.folderId = null;
+    }
+  }
+  // A favorite's tab that was unpinned in Chrome is an ordinary tab again.
+  // The favorite itself is kept, so nothing saved is lost by a stray click.
+  for (const fav of state.favorites) {
+    const tab = live.get(sess.links[fav.id]);
+    if (tab && !tab.pinned) unlink(state, sess, fav.id);
+  }
+
   const linked = new Set(Object.values(sess.links));
-  // Exact links first. Only then may a favorite claim a tab that wandered within
-  // its site, so two favorites on the same site cannot end up swapped.
-  for (const sameSite of [false, true]) {
-    for (const entry of entries) {
-      if (sess.links[entry.id] != null) continue;
-      if (sameSite && entry.kind !== "fav") continue;
-      const want = cleanUrl(entry.url);
-      const match = tabs.find((t) => {
-        if (linked.has(t.id) || isOurs(t.url)) return false;
-        const url = cleanUrl(t.pendingUrl || t.url || "");
-        if (entry.kind === "fav") return t.pinned && (sameSite ? hostOf(url) === hostOf(want) : url === want);
-        return !t.pinned && url === want && spaceOfTab(state, sess, t) === entry.spaceId;
-      });
-      if (match) {
-        sess.links[entry.id] = match.id;
-        linked.add(match.id);
+  const free = (t) => !linked.has(t.id) && !isOurs(t.url);
+  const claim = (entry, tab) => {
+    if (!tab) return;
+    sess.links[entry.id] = tab.id;
+    linked.add(tab.id);
+  };
+  // A pinned tab in Chrome is a favorite by definition, so a favorite may claim
+  // one at any time: first the page it was last on, then its saved page, then its site.
+  const at = (t) => cleanUrl(urlOf(t));
+  for (const test of [(f, t) => f.live && at(t) === f.live, (f, t) => at(t) === cleanUrl(f.url), (f, t) => hostOf(at(t)) === hostOf(f.url)]) {
+    for (const fav of state.favorites) {
+      if (sess.links[fav.id] == null) claim(fav, tabs.find((t) => t.pinned && free(t) && test(fav, t)));
+    }
+  }
+  // A pin only looks for a tab right after a restart, and only if it had one open.
+  // Otherwise an ordinary tab that happens to share its link would be swallowed.
+  if (recovering) {
+    for (const want of [(p) => p.live, (p) => cleanUrl(p.url)]) {
+      for (const pin of state.pinned) {
+        if (sess.links[pin.id] != null || !pin.live) continue;
+        claim(pin, tabs.find((t) => !t.pinned && free(t) && at(t) === want(pin) && owner(t) === pin.spaceId));
       }
     }
   }
   // A tab pinned with Chrome's own menu becomes a favorite.
   for (const tab of tabs) {
-    if (!tab.pinned || linked.has(tab.id) || !isWeb(tab.url)) continue;
-    const entry = { id: uid(), url: cleanUrl(tab.url), title: tab.title || hostOf(tab.url) };
+    if (!tab.pinned || linked.has(tab.id) || !isWeb(urlOf(tab))) continue;
+    const entry = { id: uid(), url: cleanUrl(urlOf(tab)), title: tab.title || hostOf(urlOf(tab)) };
     state.favorites.push(entry);
-    sess.links[entry.id] = tab.id;
-    linked.add(tab.id);
+    claim(entry, tab);
   }
+  await stampLive(state, sess);
 }
 
 let syncTimer;
@@ -167,11 +275,13 @@ async function safeRemove(tabIds) {
 }
 
 function archiveRecord(state, sess, tab, reason) {
-  if (!isWeb(tab.url)) return;
+  const url = urlOf(tab);
+  if (!isWeb(url)) return;
   state.archive.unshift({
     id: uid(),
-    url: tab.url,
-    title: tab.title || hostOf(tab.url),
+    url,
+    // While a page is still loading, the title belongs to the page being left.
+    title: (url === tab.url && tab.title) || hostOf(url),
     spaceId: spaceOfTab(state, sess, tab),
     closedAt: Date.now(),
     reason,
@@ -185,7 +295,7 @@ function archiveRecord(state, sess, tab, reason) {
  * the archive, so it is left open unless the person closed that one tab themselves.
  */
 async function archiveTabs(state, sess, tabs, reason, { closeUnsaved = false } = {}) {
-  const saved = tabs.filter((tab) => isWeb(tab.url));
+  const saved = tabs.filter((tab) => isWeb(urlOf(tab)));
   for (const tab of saved) archiveRecord(state, sess, tab, reason);
   // Write the archive before closing anything, so a crash cannot lose a tab.
   if (saved.length) await chrome.storage.local.set({ state });
@@ -193,7 +303,7 @@ async function archiveTabs(state, sess, tabs, reason, { closeUnsaved = false } =
   return saved.length;
 }
 
-async function todayTabs(state, sess, windowId, spaceId = state.activeSpaceId) {
+async function todayTabs(state, sess, windowId, spaceId = activeOf(state, sess, windowId)) {
   const linked = new Set(Object.values(sess.links));
   const tabs = await chrome.tabs.query({ windowId });
   return tabs.filter((t) => !t.pinned && !linked.has(t.id) && !isOurs(t.url) && spaceOfTab(state, sess, t) === spaceId);
@@ -215,12 +325,13 @@ async function focusTab(tabId) {
   return tab;
 }
 
-/** The most recent tab in this window that still exists, is not ours, and is not `skipId`. */
+/** The most recent tab that is still in this window, is not ours, and is not `skipId`. */
 async function recentTab(sess, windowId, skipId) {
   for (const id of sess.prev[windowId] || []) {
     if (id === skipId) continue;
     const tab = await chrome.tabs.get(id).catch(() => null);
-    if (tab && !isOurs(tab.url)) return tab;
+    // A tab dragged to another window is no longer "the tab I was on" here.
+    if (tab && tab.windowId === windowId && !isOurs(tab.url)) return tab;
   }
   return null;
 }
@@ -240,11 +351,12 @@ async function switchSpaceIn(state, sess, spaceId, windowId) {
   let tabs = await chrome.tabs.query({ windowId });
   // A tab opened a moment ago may not be filed yet. It belongs to the space being left.
   const loose = tabs.filter((t) => !t.pinned && t.groupId === -1).map((t) => t.id);
-  if (loose.length && state.activeSpaceId !== spaceId) {
-    await putInSpace(state, sess, windowId, state.activeSpaceId, loose).catch(() => {});
+  const leaving = activeOf(state, sess, windowId);
+  if (loose.length && leaving !== spaceId) {
+    await putInSpace(state, sess, windowId, leaving, loose).catch(() => {});
     tabs = await chrome.tabs.query({ windowId });
   }
-  state.activeSpaceId = spaceId;
+  setActive(state, sess, windowId, spaceId);
   const mine = tabs.filter((t) => !t.pinned && t.groupId === map[spaceId] && map[spaceId] != null);
   const [active] = tabs.filter((t) => t.active);
   if (map[spaceId] != null) await chrome.tabGroups.update(map[spaceId], { collapsed: false }).catch(() => {});
@@ -265,7 +377,7 @@ async function switchSpaceIn(state, sess, spaceId, windowId) {
 async function retitleGroups(sess, space) {
   for (const map of Object.values(sess.groups)) {
     if (map[space.id] == null) continue;
-    await chrome.tabGroups.update(map[space.id], { title: space.name, color: space.color }).catch(() => {});
+    await chrome.tabGroups.update(map[space.id], { title: space.groupTitle ?? space.name, color: space.color }).catch(() => {});
   }
 }
 
@@ -296,11 +408,11 @@ async function moveItem(state, sess, { item, to, windowId }) {
     delete sess.links[entry.id];
     if (tabId == null) tabId = (await chrome.tabs.create({ windowId: home, url: entry.url, active: false })).id;
     else if (from === "favs") await chrome.tabs.update(tabId, { pinned: false });
-    await putInSpace(state, sess, home, state.activeSpaceId, [tabId]);
+    await putInSpace(state, sess, home, activeOf(state, sess, home), [tabId]);
     return;
   }
 
-  const moved = entry || { id: uid(), url: cleanUrl(tab.url), title: tab.title || hostOf(tab.url) };
+  const moved = entry || { id: uid(), url: cleanUrl(urlOf(tab)), title: tab.title || hostOf(urlOf(tab)) };
   state.favorites = state.favorites.filter((e) => e.id !== moved.id);
   state.pinned = state.pinned.filter((e) => e.id !== moved.id);
   if (to.zone === "favs") {
@@ -309,7 +421,7 @@ async function moveItem(state, sess, { item, to, windowId }) {
     insertAmong(state.favorites, moved, state.favorites, to.index);
     if (tabId != null) await chrome.tabs.update(tabId, { pinned: true });
   } else {
-    moved.spaceId = to.spaceId || state.activeSpaceId;
+    moved.spaceId = to.spaceId || activeOf(state, sess, home);
     moved.folderId = to.folderId || null;
     const siblings = state.pinned.filter((e) => e.spaceId === moved.spaceId && (e.folderId || null) === moved.folderId);
     insertAmong(state.pinned, moved, siblings, to.index);
@@ -335,7 +447,7 @@ async function reorderToday(state, sess, tab, index) {
     await chrome.tabs.move(tab.id, { index: tab.index < anchor.index ? anchor.index : anchor.index + 1 });
   }
   const after = await chrome.tabs.get(tab.id);
-  if (after.groupId === -1) await putInSpace(state, sess, tab.windowId, state.activeSpaceId, [tab.id]);
+  if (after.groupId === -1) await putInSpace(state, sess, tab.windowId, activeOf(state, sess, tab.windowId), [tab.id]);
 }
 
 async function openEntry(state, sess, { id, windowId }) {
@@ -347,7 +459,7 @@ async function openEntry(state, sess, { id, windowId }) {
       await focusTab(linked);
       return;
     } catch {
-      delete sess.links[id];
+      unlink(state, sess, id);
     }
   }
   const tab = await chrome.tabs.create({ windowId, url: entry.url, active: true, pinned: entry.kind === "fav" });
@@ -380,7 +492,7 @@ async function view({ windowId }) {
       drifted: !!tab && isWeb(tab.url) && cleanUrl(tab.url) !== cleanUrl(e.url),
     };
   };
-  const space = state.spaces.find((s) => s.id === state.activeSpaceId);
+  const space = state.spaces.find((s) => s.id === activeOf(state, sess, windowId));
   const active = tabs.find((t) => t.active);
   return {
     windowId,
@@ -419,7 +531,7 @@ async function barData({ windowId }) {
       .filter((e) => sess.links[e.id] == null)
       .map((e) => ({ id: e.id, title: e.customTitle || e.title, url: e.url, space: e.kind === "fav" ? "Favorite" : name(e.spaceId) })),
     spaces: state.spaces,
-    activeSpaceId: state.activeSpaceId,
+    activeSpaceId: activeOf(state, sess, windowId),
     current: current ? { tabId: current.id, url: current.url, title: current.title, saved: linkedEntry?.kind || null } : null,
     settings: state.settings,
     archiveHours: ARCHIVE_HOURS,
@@ -496,7 +608,12 @@ function toggleSidebar(windowId) {
 
 // ---------------------------------------------------------------- everything the pages can ask for
 
-const change = (fn) => (payload) => mutate((state, sess) => fn(state, sess, payload || {}));
+const change = (fn) => (payload) =>
+  mutate(async (state, sess) => {
+    const result = await fn(state, sess, payload || {});
+    await stampLive(state, sess);
+    return result;
+  });
 
 const handlers = {
   view,
@@ -509,7 +626,7 @@ const handlers = {
   switchSpace: change((state, sess, { id, windowId }) => switchSpaceIn(state, sess, id, windowId)),
 
   stepSpace: change((state, sess, { dir, windowId }) => {
-    const at = state.spaces.findIndex((s) => s.id === state.activeSpaceId);
+    const at = state.spaces.findIndex((s) => s.id === activeOf(state, sess, windowId));
     const next = state.spaces[(at + dir + state.spaces.length) % state.spaces.length];
     return switchSpaceIn(state, sess, next.id, windowId);
   }),
@@ -518,24 +635,25 @@ const handlers = {
 
   newTab: change(async (state, sess, { windowId, url }) => {
     const tab = await chrome.tabs.create({ windowId, url, active: true });
-    await putInSpace(state, sess, tab.windowId, state.activeSpaceId, [tab.id]);
+    await putInSpace(state, sess, tab.windowId, activeOf(state, sess, tab.windowId), [tab.id]);
   }),
 
   closeTab: change(async (state, sess, { tabId }) => {
     const tab = await chrome.tabs.get(tabId);
     const rest = (await todayTabs(state, sess, tab.windowId)).filter((t) => t.id !== tabId);
-    const spaceHasMore = rest.length || Object.entries(sess.links).some(([id]) => state.pinned.some((e) => e.id === id && e.spaceId === state.activeSpaceId));
+    const here = activeOf(state, sess, tab.windowId);
+    const spaceHasMore = rest.length || Object.entries(sess.links).some(([id]) => state.pinned.some((e) => e.id === id && e.spaceId === here));
     if (tab.active && !spaceHasMore) {
-      // Keep the person in this space instead of letting Chrome jump to another one.
+      // Keep the person in this tab group instead of letting Chrome jump to another one.
       const fresh = await chrome.tabs.create({ windowId: tab.windowId, active: true });
-      await putInSpace(state, sess, tab.windowId, state.activeSpaceId, [fresh.id]);
+      await putInSpace(state, sess, tab.windowId, here, [fresh.id]);
     }
     await archiveTabs(state, sess, [tab], "manual", { closeUnsaved: true });
   }),
 
   closeEntryTab: change(async (state, sess, { id }) => {
     const tabId = sess.links[id];
-    delete sess.links[id];
+    unlink(state, sess, id);
     if (tabId != null) await safeRemove([tabId]);
   }),
 
@@ -603,6 +721,7 @@ const handlers = {
   favoriteCurrent: change(async (state, sess, { windowId }) => {
     const tab = await contextTab(sess, windowId);
     if (!tab) return;
+    if (state.favorites.some((e) => sess.links[e.id] === tab.id)) return;
     const pin = state.pinned.find((e) => sess.links[e.id] === tab.id);
     const item = pin ? { kind: "pin", id: pin.id } : { kind: "tab", tabId: tab.id };
     await moveItem(state, sess, { item, to: { zone: "favs" }, windowId });
@@ -614,8 +733,8 @@ const handlers = {
     if (tab) await archiveTabs(state, sess, [tab], "manual", { closeUnsaved: true });
   }),
 
-  addFolder: change((state, sess, { name }) => {
-    const folder = { id: uid(), spaceId: state.activeSpaceId, name: name || "New Folder", open: true };
+  addFolder: change((state, sess, { name, windowId }) => {
+    const folder = { id: uid(), spaceId: activeOf(state, sess, windowId), name: name || "New Folder", open: true };
     state.folders.push(folder);
     return folder.id;
   }),
@@ -644,8 +763,8 @@ const handlers = {
       // would pull the cursor out of that box, so the sidebar switches once naming is done.
       const tabs = await chrome.tabs.query({ windowId });
       const loose = tabs.filter((t) => !t.pinned && t.groupId === -1).map((t) => t.id);
-      await putInSpace(state, sess, windowId, state.activeSpaceId, loose).catch(() => {});
-      state.activeSpaceId = space.id;
+      await putInSpace(state, sess, windowId, activeOf(state, sess, windowId), loose).catch(() => {});
+      setActive(state, sess, windowId, space.id);
     } else await switchSpaceIn(state, sess, space.id, windowId);
     return space.id;
   }),
@@ -653,7 +772,10 @@ const handlers = {
   updateSpace: change(async (state, sess, { id, patch }) => {
     const space = state.spaces.find((s) => s.id === id);
     if (!space) return;
-    if (typeof patch.name === "string" && patch.name.trim()) space.name = uniqueName(state, patch.name, id);
+    if (typeof patch.name === "string" && patch.name.trim()) {
+      space.name = uniqueName(state, patch.name, id);
+      space.groupTitle = space.name;
+    }
     if (typeof patch.icon === "string") space.icon = patch.icon;
     if (COLORS.includes(patch.color)) space.color = patch.color;
     await retitleGroups(sess, space);
@@ -689,7 +811,7 @@ const handlers = {
     const name = (id) => state.spaces.find((s) => s.id === id)?.name || "";
     return state.archive
       .filter((a) => !needle || a.title.toLowerCase().includes(needle) || a.url.toLowerCase().includes(needle))
-      .slice(0, 300)
+      .slice(0, ARCHIVE_LIMIT)
       .map((a) => ({ ...a, space: name(a.spaceId) }));
   },
 
@@ -697,8 +819,9 @@ const handlers = {
     const item = state.archive.find((a) => a.id === id);
     if (!item) return;
     state.archive = state.archive.filter((a) => a.id !== id);
-    const spaceId = state.spaces.some((s) => s.id === item.spaceId) ? item.spaceId : state.activeSpaceId;
-    if (spaceId !== state.activeSpaceId) await switchSpaceIn(state, sess, spaceId, windowId);
+    const here = activeOf(state, sess, windowId);
+    const spaceId = state.spaces.some((s) => s.id === item.spaceId) ? item.spaceId : here;
+    if (spaceId !== here) await switchSpaceIn(state, sess, spaceId, windowId);
     const tab = await chrome.tabs.create({ windowId, url: item.url, active: true });
     await putInSpace(state, sess, tab.windowId, spaceId, [tab.id]);
   }),
@@ -763,9 +886,9 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
     sess.prev[windowId] = [tabId, ...prev.filter((id) => id !== tabId)].slice(0, 6);
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (!tab || tab.pinned || tab.groupId === -1) return;
-    // Clicking a tab that lives in another space takes the sidebar there too.
+    // Clicking a tab that lives in another tab group takes this window's sidebar there too.
     const owner = Object.entries(sess.groups[windowId] || {}).find(([, groupId]) => groupId === tab.groupId);
-    if (owner && owner[0] !== state.activeSpaceId) state.activeSpaceId = owner[0];
+    if (owner && owner[0] !== activeOf(state, sess, windowId)) setActive(state, sess, windowId, owner[0]);
   }).catch(console.warn);
 });
 
@@ -776,7 +899,7 @@ chrome.tabs.onCreated.addListener((created) => {
     const tab = await chrome.tabs.get(created.id).catch(() => null);
     if (!tab || tab.pinned || tab.groupId !== -1) return;
     const win = await chrome.windows.get(tab.windowId).catch(() => null);
-    if (win?.type === "normal") await putInSpace(state, sess, tab.windowId, state.activeSpaceId, [tab.id]).catch(() => {});
+    if (win?.type === "normal") await putInSpace(state, sess, tab.windowId, activeOf(state, sess, tab.windowId), [tab.id]).catch(() => {});
   }).catch(console.warn);
   scheduleSync();
 });

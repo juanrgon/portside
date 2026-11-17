@@ -5,12 +5,13 @@
   "type": "module",
   "description": "A Chrome extension: a sidebar with spaces, pinned tabs, a command bar, and tabs that tidy themselves up.",
   "scripts": {
-    "check": "node --check extension/background.js && node --test tests/unit/*.test.mjs && node tests/e2e/run.mjs",
+    "check": "node --check extension/background.js && node --test tests/unit/*.test.mjs && node tests/e2e/run.mjs && node tests/e2e/qa/defects.mjs && node tests/e2e/qa/controls.mjs",
     "test:unit": "node --test tests/unit/*.test.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
     "icons": "node script/make-icons.mjs",
     "package": "script/package.sh",
-    "store:shots": "node script/store-shots.mjs"
+    "store:shots": "node script/store-shots.mjs",
+    "test:qa": "node tests/e2e/qa/defects.mjs && node tests/e2e/qa/controls.mjs"
   },
   "devDependencies": {
     "playwright-core": "1.53.2"

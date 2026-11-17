@@ -21,6 +21,7 @@ test("typed text is a link only when it looks like one", () => {
   assert.equal(toUrl("how to pin a tab"), null);
   assert.equal(toUrl("tiptap"), null);
   assert.equal(toUrl("node.js"), "https://node.js");
+  assert.equal(toUrl("[::1]:3000/app"), "http://[::1]:3000/app");
 });
 
 test("a site name beats a word buried in a title", () => {

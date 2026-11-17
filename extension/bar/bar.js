@@ -124,7 +124,7 @@ function actions() {
     { label: "Clear unpinned tabs", run: then("clearToday") },
     { label: "Show sidebar", run: () => showSidebar("tabs") },
     { label: "New tab group", run: async () => { showSidebar("tabs", false); await send("addSpace"); await closeSelf(); } },
-    ...data.spaces.filter((s) => s.id !== data.activeSpaceId).map((s) => ({ label: `Go to ${s.name}`, run: async () => { await closeSelf(); await send("switchSpace", { id: s.id }); } })),
+    ...data.spaces.filter((s) => s.id !== data.activeSpaceId).map((s) => ({ label: `Go to ${s.name}`, run: async () => { await send("switchSpace", { id: s.id }); await closeSelf(); } })),
     ...data.archiveHours.filter((h) => h !== data.settings.archiveAfterHours).map((h) => ({ label: `Archive unpinned tabs after ${names[h]}`, rare: true, run: then("setSetting", { key: "archiveAfterHours", value: h }) })),
     { label: "Set up keyboard shortcuts", run: () => go("chrome://extensions/shortcuts") },
     !data.history && { label: "Search my browsing history too", run: askForHistory },
@@ -230,14 +230,19 @@ function select(index) {
   });
 }
 
+let running = false;
 async function run(index) {
   const hit = hits[index];
-  if (!hit) return;
+  // A second Enter while the first is still working must not run the action twice.
+  if (!hit || running) return;
+  running = true;
   try {
     await hit.run();
   } catch (error) {
     leaving = false;
     console.warn(error);
+  } finally {
+    running = false;
   }
 }
 

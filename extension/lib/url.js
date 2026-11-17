@@ -28,6 +28,7 @@ export function toUrl(text) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t;
   if (/^(chrome|about|file|view-source):/i.test(t)) return t;
   if (/^(([\w-]+\.)*localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$/i.test(t)) return "http://" + t;
+  if (/^\[[0-9a-f:.]+\](:\d+)?([/?#].*)?$/i.test(t)) return "http://" + t;
   if (/^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(:\d+)?([/?#].*)?$/i.test(t)) return "https://" + t;
   return null;
 }

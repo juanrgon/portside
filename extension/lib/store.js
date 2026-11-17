@@ -42,7 +42,7 @@ export async function getState() {
 
 export async function getSess() {
   const { sess } = await chrome.storage.session.get("sess");
-  return { links: {}, groups: {}, prev: {}, ...(sess || {}) };
+  return { links: {}, groups: {}, prev: {}, active: {}, ...(sess || {}) };
 }
 
 let queue = Promise.resolve();

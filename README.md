@@ -80,6 +80,8 @@ What that means in practice:
 
 - Chrome's tab strip is still there. Leave it on top. If you turn on Chrome's own vertical tabs you get two sidebars.
 - A tab group you make in the tab strip shows up in the sidebar. Rename or recolor it in either place and the other follows.
+- Each window shows its own tab group. Pinning, unpinning, or moving a saved tab with Chrome's own menus is picked up by the sidebar.
+- After a restart, a pinned tab finds the tab it had open, even if that tab had wandered off its saved page.
 - Chrome's side panel has its own small header and a minimum width. The extension cannot remove either.
 - Chrome cannot hide tabs, so tabs from other tab groups sit folded in the tab strip instead of vanishing.
 - Not built: split view (Chrome has its own), link previews, and a floating mini window.
