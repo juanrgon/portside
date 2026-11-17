@@ -46,6 +46,11 @@ export async function getSess() {
 
 let queue = Promise.resolve();
 
+/** Resolves once every change already under way has been saved, so a read never sees half of one. */
+export function settled() {
+  return queue;
+}
+
 /**
  * Run one change at a time. `fn` gets the saved state and the session state,
  * edits them in place, and both are written back if they changed.

@@ -2,7 +2,7 @@
 // happens here, one at a time, so the sidebar and the command bar only have
 // to ask for things and draw the result.
 
-import { ARCHIVE_HOURS, ARCHIVE_LIMIT, COLORS, getSess, getState, mutate, uid } from "./lib/store.js";
+import { ARCHIVE_HOURS, ARCHIVE_LIMIT, COLORS, getSess, getState, mutate, settled, uid } from "./lib/store.js";
 import { cleanUrl, hostOf, isWeb, staleTabs } from "./lib/url.js";
 
 const ORIGIN = chrome.runtime.getURL("");
@@ -344,6 +344,7 @@ async function openEntry(state, sess, { id, windowId }) {
 // ---------------------------------------------------------------- what the sidebar draws
 
 async function view({ windowId }) {
+  await settled();
   const state = await getState();
   const sess = await getSess();
   const tabs = await chrome.tabs.query({ windowId });
@@ -387,6 +388,7 @@ async function view({ windowId }) {
 }
 
 async function barData({ windowId }) {
+  await settled();
   const state = await getState();
   const sess = await getSess();
   const tabs = await chrome.tabs.query({ windowType: "normal" });
@@ -666,6 +668,7 @@ const handlers = {
   }),
 
   archiveList: async ({ q }) => {
+    await settled();
     const state = await getState();
     const needle = (q || "").trim().toLowerCase();
     const name = (id) => state.spaces.find((s) => s.id === id)?.name || "";
